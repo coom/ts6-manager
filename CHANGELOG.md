@@ -118,6 +118,13 @@ Full security review of the codebase. Twelve issues, three of them high severity
   field as a string and `"0"` is truthy, so the clients table badged every
   connected client as away, permanently, and every message rendered as read.
   Reported in coom/ts6-manager#2.
+- Rejected uploads answered 500 "Internal server error". A file over the size
+  limit now gets 413 and any other multer rejection 400, with multer's message;
+  an extension the music library does not accept gets 400.
+- Accented upload filenames were decoded as Latin-1 (`été.mp3` became
+  `Ã©tÃ©.mp3`), garbling the title and artist the music library derives from
+  them. multer now decodes them as UTF-8; songs uploaded earlier keep their
+  stored title.
 
 ### Added
 

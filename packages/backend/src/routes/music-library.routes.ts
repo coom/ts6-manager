@@ -27,13 +27,14 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
+  defParamCharset: 'utf8',
   limits: { fileSize: MAX_FILE_SIZE },
   fileFilter: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
     if (ALLOWED_EXTENSIONS.includes(ext)) {
       cb(null, true);
     } else {
-      cb(new Error(`Unsupported file type: ${ext}`));
+      cb(new AppError(400, `Unsupported file type: ${ext}`));
     }
   },
 });
