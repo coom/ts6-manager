@@ -134,3 +134,8 @@ Full security review of the codebase. Twelve issues, three of them high severity
   Settings → YouTube.
 - `packages/sidecar/ts6-media-sidecar[.exe]` is gitignored, so the compiled Go
   binary cannot be committed.
+- CI also runs every Monday and on demand (`workflow_dispatch`), so high and
+  critical advisories published between pushes fail the audit step instead of
+  going unnoticed. The sidecar job runs `govulncheck`, which fails on any
+  vulnerability the code reaches, including the Go standard library at the
+  version `go.mod` requires.

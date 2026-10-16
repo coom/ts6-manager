@@ -4,6 +4,11 @@ on:
   push:
     branches: [main, security-hardening]
   pull_request:
+  # Advisories are published without any push, and GitHub refuses to re-run a
+  # run older than a month: re-audit weekly, and allow a manual run.
+  schedule:
+    - cron: '23 6 * * 1'
+  workflow_dispatch:
 
 jobs:
   node:
@@ -46,7 +51,7 @@ jobs:
         run: pnpm run build
 
   sidecar:
-    name: Build and vet Go sidecar
+    name: Build, vet and scan Go sidecar
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -64,6 +69,11 @@ jobs:
 
       - name: Vet
         run: go vet ./...
+
+      # Fails only on vulnerabilities the code reaches. go.mod's go directive is
+      # the security floor: a stdlib finding means raising it to the fixed patch.
+      - name: Vulnerability check
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
 
   docker:
     name: Build Docker images
