@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Outlet, Navigate } from 'react-router-dom';
+import { Outlet, Navigate } from 'react-router';
 import { useQuery } from '@tanstack/react-query';
 import { Sidebar } from './Sidebar';
 import { Header } from './Header';

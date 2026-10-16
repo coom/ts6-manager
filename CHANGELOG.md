@@ -53,20 +53,24 @@ Full security review of the codebase. Twelve issues, three of them high severity
   from clean to one critical and 27 high. axios moves to 1.20 (outbound-request
   advisories, among them `maxRedirects: 0` not enforced by the fetch adapter;
   the backend uses the Node adapter, so the SSRF guard held). Also bumped:
-  express, react-router-dom, `@xmldom/xmldom` (SAML parsing), undici,
-  proxy-addr, qs, body-parser, nanoid, ip-address, deepmerge-ts and the build
-  tooling; the unused `pino` and `pino-pretty` are gone. multer moves from
-  1.4.5-lts.2 to 2.4: the `-lts` suffix makes it a prerelease that advisory
-  ranges never match, so the audit never reported its ten high-severity upload
-  DoS advisories. The media sidecar now requires Go 1.27.2, since 1.25 no
-  longer gets security releases and six reachable stdlib advisories in
-  `net/http` and `crypto/tls` are fixed only in 1.26.9 and 1.27.2; `x/net`
-  moves to 0.60 and `x/crypto` to 0.57. Four advisories are now ignored in
-  `auditConfig.ignoreGhsas`: `braces` (no fix released) and
-  `postcss-selector-parser` only reach the Tailwind 3 build; the two
-  `react-router` ones are fixed only in v7 and are unreachable here (no SSR,
-  every navigation target is static or a numeric id). The previously ignored
-  esbuild advisory has been withdrawn and is no longer listed.
+  express, `@xmldom/xmldom` (SAML parsing), undici, proxy-addr, qs,
+  body-parser, nanoid, ip-address, deepmerge-ts and the build tooling; the
+  unused `pino` and `pino-pretty` are gone. The frontend moves from
+  `react-router-dom` 6 to `react-router` 7.18, the last release line that
+  supports React 18, for its fixes to an open redirect through a backslash in
+  `<Link>` / `useNavigate` and a constructor injection in SSR error hydration
+  (neither reachable here: no SSR, every navigation target is static or a
+  numeric id). Navigation keeps the v6 behaviour (no React transitions).
+  multer moves from 1.4.5-lts.2 to 2.4: the `-lts` suffix makes it a
+  prerelease that advisory ranges never match, so the audit never reported its
+  ten high-severity upload DoS advisories. The media sidecar now requires Go
+  1.27.2, since 1.25 no longer gets security releases and six reachable stdlib
+  advisories in `net/http` and `crypto/tls` are fixed only in 1.26.9 and
+  1.27.2; `x/net` moves to 0.60 and `x/crypto` to 0.57. Two advisories are now
+  ignored in `auditConfig.ignoreGhsas`, `braces` (no fix released) and
+  `postcss-selector-parser`, both reached only through the Tailwind 3 build.
+  The previously ignored esbuild advisory has been withdrawn and is no longer
+  listed.
 
 ### Changed
 

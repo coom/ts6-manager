@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { Navigate } from 'react-router-dom';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Navigate } from 'react-router';
+import { useNavigate, useLocation } from 'react-router';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
