@@ -49,6 +49,24 @@ Full security review of the codebase. Twelve issues, three of them high severity
   requests when `SIDECAR_TOKEN` was unset. Restricted to `http(s)` and fails
   closed; the backend mints a random token per spawn, so local mode needs no
   configuration.
+- **Dependency advisories published after the review.** `pnpm audit` had gone
+  from clean to one critical and 27 high. axios moves to 1.20 (outbound-request
+  advisories, among them `maxRedirects: 0` not enforced by the fetch adapter;
+  the backend uses the Node adapter, so the SSRF guard held). Also bumped:
+  express, react-router-dom, `@xmldom/xmldom` (SAML parsing), undici,
+  proxy-addr, qs, body-parser, nanoid, ip-address, deepmerge-ts and the build
+  tooling; the unused `pino` and `pino-pretty` are gone. multer moves from
+  1.4.5-lts.2 to 2.4: the `-lts` suffix makes it a prerelease that advisory
+  ranges never match, so the audit never reported its ten high-severity upload
+  DoS advisories. The media sidecar now requires Go 1.27.2, since 1.25 no
+  longer gets security releases and six reachable stdlib advisories in
+  `net/http` and `crypto/tls` are fixed only in 1.26.9 and 1.27.2; `x/net`
+  moves to 0.60 and `x/crypto` to 0.57. Four advisories are now ignored in
+  `auditConfig.ignoreGhsas`: `braces` (no fix released) and
+  `postcss-selector-parser` only reach the Tailwind 3 build; the two
+  `react-router` ones are fixed only in v7 and are unreachable here (no SSR,
+  every navigation target is static or a numeric id). The previously ignored
+  esbuild advisory has been withdrawn and is no longer listed.
 
 ### Changed
 
