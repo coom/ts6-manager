@@ -7,7 +7,9 @@ COPY packages/sidecar/main.go .
 RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /sidecar main.go
 
 FROM debian:bookworm-slim
+# upgrade: the slim base image lags behind Debian's security updates.
 RUN apt-get update && \
+    apt-get upgrade -y && \
     apt-get install -y --no-install-recommends ffmpeg ca-certificates && \
     apt-get clean && rm -rf /var/lib/apt/lists/* && \
     useradd --system --no-create-home --shell /usr/sbin/nologin sidecar

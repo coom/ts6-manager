@@ -150,3 +150,18 @@ Full security review of the codebase. Twelve issues, three of them high severity
   going unnoticed. The sidecar job runs `govulncheck`, which fails on any
   vulnerability the code reaches, including the Go standard library at the
   version `go.mod` requires.
+- CI warns before a base runtime goes out of support. A new `eol` job reads the
+  Node, Go and Debian versions pinned in the Dockerfiles, `go.mod` and `ci.yml`,
+  fails 60 days before any of them reaches end of life and warns once one has
+  left active support; for Go, which only patches its two latest releases, it
+  warns as soon as a newer release ships. `node:22-slim` is now spelled
+  `node:22-bookworm-slim` (the same image) so the Debian release is visible.
+- Each Docker image is scanned with Trivy for high and critical vulnerabilities
+  in its system packages that already have a fix. Trivy is installed from its
+  release archive with a pinned checksum rather than through
+  `aquasecurity/trivy-action`, whose tags were hijacked in March 2026. The
+  images now apply the distribution's pending security updates at build
+  (`apt-get upgrade`, `apk upgrade`): the first scan found seven critical and
+  high Perl fixes the Debian base image did not carry yet. That layer is cached,
+  so rebuild with `docker compose build --pull --no-cache` from time to time to
+  pick up new updates.

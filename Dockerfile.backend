@@ -1,14 +1,17 @@
 # syntax=docker/dockerfile:1.4
-# Node 20 reached end-of-life in April 2026 — track the active LTS line.
-FROM node:22-slim AS base
+# Node 20 reached end-of-life in April 2026. The eol job in CI fails 60 days
+# before this line does.
+FROM node:22-bookworm-slim AS base
 # The npm bundled with the Node image lags behind and prints upgrade notices
 # on every npx invocation at container start.
 RUN npm install -g npm@11 && corepack enable && corepack prepare pnpm@9 --activate
 
 # Install system deps: openssl (Prisma), ffmpeg (audio), python3 (yt-dlp)
 # yt-dlp lives in its own venv instead of polluting the system Python
-# (avoids --break-system-packages).
+# (avoids --break-system-packages). upgrade: the slim base image lags behind
+# Debian's security updates.
 RUN apt-get update && \
+    apt-get upgrade -y && \
     apt-get install -y --no-install-recommends \
       openssl \
       ffmpeg \
