@@ -1,6 +1,8 @@
 import { createApp } from './app.js';
-import { createServer } from 'http';
+import { createServer, type IncomingMessage } from 'http';
 import { WebSocketServer } from 'ws';
+import { bindIdentity, type WsIdentity } from './ws/ws-broadcast.js';
+import type { JwtPayload } from '@ts6/common';
 import { PrismaClient } from '../generated/prisma/index.js';
 import { ConnectionPool } from './ts-client/connection-pool.js';
 import { BotEngine } from './bot-engine/engine.js';
@@ -12,6 +14,7 @@ import { applyTrustProxy, loadTrustProxy } from './routes/settings.routes.js';
 import { loadSamlRuntime } from './auth/saml/saml-config.js';
 import { config } from './config.js';
 import { setYtCookieFile } from './voice/audio/youtube.js';
+import { PlaylistImporter } from './voice/playlist-import.js';
 import jwt from 'jsonwebtoken';
 import fs from 'fs';
 import path from 'path';
@@ -29,26 +32,12 @@ process.on('unhandledRejection', (reason) => {
 });
 
 async function main() {
-  // C1: JWT secret startup guard
-  if (config.jwtSecret === 'dev-secret-change-me-in-production') {
-    if (config.nodeEnv === 'production') {
-      console.error('[FATAL] JWT_SECRET is set to the default value. Set a secure JWT_SECRET environment variable before running in production.');
-      process.exit(1);
-    }
-    console.warn('[WARN] JWT_SECRET is using the default development value. Set JWT_SECRET in production!');
-  }
-
-  // ENCRYPTION_KEY startup guard: stored credentials (SSH passwords, API keys)
-  // must not be decryptable from a leaked JWT_SECRET alone.
-  if (config.nodeEnv === 'production') {
-    if (!process.env.ENCRYPTION_KEY) {
-      console.error('[FATAL] ENCRYPTION_KEY is not set. Set a dedicated ENCRYPTION_KEY (distinct from JWT_SECRET) before running in production.');
-      process.exit(1);
-    }
-    if (process.env.ENCRYPTION_KEY === config.jwtSecret) {
-      console.error('[FATAL] ENCRYPTION_KEY must be different from JWT_SECRET.');
-      process.exit(1);
-    }
+  // config.ts already requires both secrets to be present and long enough,
+  // in every environment. What is left to check is that they are not the same
+  // value, so a leaked signing key cannot also decrypt stored credentials.
+  if (config.encryptionKey === config.jwtSecret) {
+    console.error('[FATAL] ENCRYPTION_KEY must be different from JWT_SECRET.');
+    process.exit(1);
   }
 
   // Configure yt-dlp cookie file: env var takes priority, then saved file from data dir
@@ -83,16 +72,53 @@ async function main() {
     server,
     path: '/ws',
     verifyClient: ({ req }, done) => {
-      try {
-        const wsUrl = new URL(req.url!, `http://${req.headers.host}`);
-        const token = wsUrl.searchParams.get('token');
-        if (!token) return done(false, 401, 'Missing token');
-        jwt.verify(token, config.jwtSecret, { algorithms: ['HS256'] });
-        done(true);
-      } catch {
-        done(false, 401, 'Invalid token');
-      }
+      // Mirrors middleware/auth.ts: assert the token class, then confirm the
+      // account is still live. Verifying the signature alone would accept a
+      // pre-MFA challenge token and would keep serving a disabled account.
+      void (async () => {
+        try {
+          const wsUrl = new URL(req.url!, `http://${req.headers.host}`);
+          const token = wsUrl.searchParams.get('token');
+          if (!token) return done(false, 401, 'Missing token');
+
+          const payload = jwt.verify(token, config.jwtSecret, { algorithms: ['HS256'] }) as JwtPayload;
+          if (payload.typ !== 'access') return done(false, 401, 'Invalid token');
+
+          const user = await prisma.user.findUnique({
+            where: { id: payload.id },
+            select: { enabled: true, role: true },
+          });
+          if (!user || !user.enabled) return done(false, 401, 'Invalid token');
+
+          const grants = user.role === 'admin'
+            ? []
+            : await prisma.userServerAccess.findMany({
+                where: { userId: payload.id },
+                select: { serverConfigId: true },
+              });
+
+          (req as IncomingMessage & { wsIdentity?: WsIdentity }).wsIdentity = {
+            id: payload.id,
+            role: user.role,
+            serverIds: new Set(grants.map((g: { serverConfigId: number }) => g.serverConfigId)),
+          };
+          done(true);
+        } catch {
+          done(false, 401, 'Invalid token');
+        }
+      })();
     },
+  });
+
+  // Carry the identity resolved in verifyClient onto the socket, so broadcasts
+  // can be filtered per user (see ws/ws-broadcast.ts).
+  wss.on('connection', (socket, req) => {
+    const identity = (req as IncomingMessage & { wsIdentity?: WsIdentity }).wsIdentity;
+    if (!identity) {
+      socket.close(1008, 'Unauthenticated');
+      return;
+    }
+    bindIdentity(socket, identity);
   });
 
   // Initialize TS connection pool
@@ -117,12 +143,16 @@ async function main() {
   app.locals.voiceBotManager = voiceBotManager;
   await voiceBotManager.start();
 
+  const playlistImporter = new PlaylistImporter(prisma);
+  app.locals.playlistImporter = playlistImporter;
+
   // Wire VoiceBotManager into BotEngine for voice action nodes in flows
   botEngine.setVoiceBotManager(voiceBotManager);
 
   // Wire Music Command Handler for text-based music bot control (!radio, !play, etc.)
   // Listens directly on each VoiceBot's TS3 connection (no SSH needed)
   const musicCommandHandler = new MusicCommandHandler(prisma, voiceBotManager, connectionPool);
+  musicCommandHandler.setPlaylistImporter(playlistImporter);
   voiceBotManager.setMusicCommandHandler(musicCommandHandler);
 
   // Discord bridge: slash commands, TS notifications, stats (non-blocking)

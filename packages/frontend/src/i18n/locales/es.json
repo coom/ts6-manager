@@ -279,7 +279,17 @@
       "toastCookiesSaved": "Cookies guardadas",
       "toastSaveFailed": "Error al guardar las cookies",
       "toastCookiesRemoved": "Archivo de cookies eliminado",
-      "toastRemoveFailed": "Error al eliminar las cookies"
+      "toastRemoveFailed": "Error al eliminar las cookies",
+      "playlistLimit": {
+        "title": "Límite de importación de listas",
+        "description": "Número máximo de pistas descargadas al importar una lista de YouTube, desde la biblioteca musical o con !play en TeamSpeak/Discord.",
+        "maxTracks": "Pistas máx. por importación",
+        "hint": "Las pistas que ya están en la lista no cuentan para el límite. Lo que lo supere se indica como omitido y nunca se descarga. 0 desactiva la importación.",
+        "save": "Guardar",
+        "saving": "Guardando...",
+        "toastSaved": "Límite de importación guardado",
+        "toastSaveFailed": "No se pudo guardar el límite de importación"
+      }
     },
     "discord": {
       "title": "Integración de Discord",
@@ -312,7 +322,7 @@
       "watchChannel": "Vigilar un canal específico",
       "wholeServer": "Todo el servidor (conexión / desconexión)",
       "watchChannelPlaceholder": "ID del canal (o déjelo vacío para todo el servidor)",
-      "watchChannelHint": "Vacío = notificar al conectar/desconectar del servidor. Definido = notificar solo al entrar/salir de ese canal.",
+      "watchChannelHint": "Vacío = notificar al conectar/desconectar del servidor, número de conectados de todo el servidor. Definido = notificaciones y recuento limitados a ese canal. El recuento se muestra en el apodo del bot, bots de música excluidos.",
       "joinMessage": "Mensaje de entrada",
       "leaveMessage": "Mensaje de salida",
       "templateVariables": "Variables:",
@@ -1254,5 +1264,15 @@
       "moveDown": "Bajar",
       "removeTooltip": "Quitar de la cola"
     }
+  },
+  "playlistImport": {
+    "button": "Importar lista",
+    "started": "Importando «{{name}}» — {{n}} pista(s)",
+    "progress": "Importando… {{done}} de {{total}}",
+    "done": "Importación terminada — {{done}} pista(s) añadida(s)",
+    "skipped": "{{n}} ya presente(s)",
+    "truncated": "{{n}} por encima del límite",
+    "failed": "Error al importar la lista",
+    "lost": "Se perdió el seguimiento de la importación — puede que haya terminado o que el servidor se haya reiniciado"
   }
 }

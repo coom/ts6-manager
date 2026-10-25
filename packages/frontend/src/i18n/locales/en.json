@@ -279,7 +279,17 @@
       "toastCookiesSaved": "Cookies saved",
       "toastSaveFailed": "Failed to save cookies",
       "toastCookiesRemoved": "Cookie file removed",
-      "toastRemoveFailed": "Failed to remove cookies"
+      "toastRemoveFailed": "Failed to remove cookies",
+      "playlistLimit": {
+        "title": "Playlist import limit",
+        "description": "Maximum number of tracks fetched when importing a YouTube playlist, from the music library or from !play in TeamSpeak/Discord.",
+        "maxTracks": "Max tracks per import",
+        "hint": "Tracks already in the playlist do not count towards the limit. Anything beyond it is reported as skipped, never downloaded. 0 disables importing.",
+        "save": "Save",
+        "saving": "Saving...",
+        "toastSaved": "Import limit saved",
+        "toastSaveFailed": "Failed to save the import limit"
+      }
     },
     "discord": {
       "title": "Discord Integration",
@@ -312,7 +322,7 @@
       "watchChannel": "Watch a specific channel",
       "wholeServer": "Whole server (connect / disconnect)",
       "watchChannelPlaceholder": "Channel ID (or leave empty for whole-server)",
-      "watchChannelHint": "Empty = notify on server connect/disconnect. Set = notify only on join/leave of that channel.",
+      "watchChannelHint": "Empty = notify on server connect/disconnect, member count covers the whole server. Set = notifications and member count scoped to that channel. The count shows in the bot's nickname, music bots excluded.",
       "joinMessage": "Join message",
       "leaveMessage": "Leave message",
       "templateVariables": "Variables:",
@@ -1254,5 +1264,15 @@
       "moveDown": "Move down",
       "removeTooltip": "Remove from queue"
     }
+  },
+  "playlistImport": {
+    "button": "Import playlist",
+    "started": "Importing \"{{name}}\" — {{n}} track(s)",
+    "progress": "Importing… {{done}} of {{total}}",
+    "done": "Import finished — {{done}} track(s) added",
+    "skipped": "{{n}} already present",
+    "truncated": "{{n}} beyond the limit",
+    "failed": "Playlist import failed",
+    "lost": "Lost track of the import — the job may have finished or the server restarted"
   }
 }

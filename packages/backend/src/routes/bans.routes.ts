@@ -10,7 +10,9 @@ const getClient = (req: Request) => {
 };
 const getSid = (req: Request) => parseInt(String(req.params.sid));
 
-banRoutes.get('/', async (req: Request, res: Response, next) => {
+// banlist exposes banned IPs and last-known nicknames; the UI already scopes
+// Bans to admins, so enforce the same boundary server-side.
+banRoutes.get('/', requireRole('admin'), async (req: Request, res: Response, next) => {
   try { res.json(await getClient(req).execute(getSid(req), 'banlist')); } catch (err) { next(err); }
 });
 

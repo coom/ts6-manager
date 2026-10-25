@@ -81,6 +81,10 @@ model TsServerConfig {
   sshPort      Int      @default(10022)
   sshUsername  String?
   sshPassword  String?
+  /// SHA-256 fingerprint of the server's SSH host key, pinned on first connect
+  /// (trust on first use). A later mismatch aborts the connection instead of
+  /// handing the ServerQuery password to whoever answered.
+  sshHostKeyFp String?
   enabled      Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -90,6 +94,7 @@ model TsServerConfig {
   botLogs       BotExecutionLog[]
   musicBots     MusicBot[]
   songs         Song[]
+  playlists     Playlist[]
   radioStations RadioStation[]
   widgets       Widget[]
   musicRequests MusicRequest[]
@@ -205,9 +210,18 @@ model Playlist {
   name       String
   musicBotId Int?
   musicBot   MusicBot? @relation(fields: [musicBotId], references: [id], onDelete: SetNull)
+  /// Scope. Song is already scoped per server config, so without this two
+  /// TeamSpeak servers importing the same YouTube playlist would contend for
+  /// one row and mix tracks from different libraries.
+  serverConfigId Int?
+  serverConfig   TsServerConfig? @relation(fields: [serverConfigId], references: [id], onDelete: Cascade)
+  /// YouTube playlist id, set on import. Null for hand-made playlists.
+  sourceId   String?
   createdAt  DateTime  @default(now())
 
   songs PlaylistSong[]
+
+  @@unique([serverConfigId, sourceId])
 }
 
 model PlaylistSong {

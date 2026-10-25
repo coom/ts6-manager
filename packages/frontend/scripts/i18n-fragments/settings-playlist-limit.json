@@ -1,0 +1,75 @@
+{
+  "namespace": "settings",
+  "keys": {
+    "en": {
+      "youtube": {
+        "playlistLimit": {
+          "title": "Playlist import limit",
+          "description": "Maximum number of tracks fetched when importing a YouTube playlist, from the music library or from !play in TeamSpeak/Discord.",
+          "maxTracks": "Max tracks per import",
+          "hint": "Tracks already in the playlist do not count towards the limit. Anything beyond it is reported as skipped, never downloaded. 0 disables importing.",
+          "save": "Save",
+          "saving": "Saving...",
+          "toastSaved": "Import limit saved",
+          "toastSaveFailed": "Failed to save the import limit"
+        }
+      }
+    },
+    "fr": {
+      "youtube": {
+        "playlistLimit": {
+          "title": "Limite d'import de playlist",
+          "description": "Nombre maximum de pistes récupérées lors de l'import d'une playlist YouTube, depuis la bibliothèque musicale ou via !play sur TeamSpeak/Discord.",
+          "maxTracks": "Pistes max par import",
+          "hint": "Les pistes déjà présentes dans la playlist ne comptent pas dans la limite. Ce qui la dépasse est signalé comme ignoré, jamais téléchargé. 0 désactive l'import.",
+          "save": "Enregistrer",
+          "saving": "Enregistrement...",
+          "toastSaved": "Limite d'import enregistrée",
+          "toastSaveFailed": "Échec de l'enregistrement de la limite d'import"
+        }
+      }
+    },
+    "de": {
+      "youtube": {
+        "playlistLimit": {
+          "title": "Limit für Playlist-Import",
+          "description": "Maximale Anzahl an Titeln, die beim Import einer YouTube-Playlist geladen werden — aus der Musikbibliothek oder per !play in TeamSpeak/Discord.",
+          "maxTracks": "Max. Titel pro Import",
+          "hint": "Bereits in der Playlist vorhandene Titel zählen nicht zum Limit. Alles darüber hinaus wird als übersprungen gemeldet und nie heruntergeladen. 0 deaktiviert den Import.",
+          "save": "Speichern",
+          "saving": "Speichern...",
+          "toastSaved": "Import-Limit gespeichert",
+          "toastSaveFailed": "Import-Limit konnte nicht gespeichert werden"
+        }
+      }
+    },
+    "es": {
+      "youtube": {
+        "playlistLimit": {
+          "title": "Límite de importación de listas",
+          "description": "Número máximo de pistas descargadas al importar una lista de YouTube, desde la biblioteca musical o con !play en TeamSpeak/Discord.",
+          "maxTracks": "Pistas máx. por importación",
+          "hint": "Las pistas que ya están en la lista no cuentan para el límite. Lo que lo supere se indica como omitido y nunca se descarga. 0 desactiva la importación.",
+          "save": "Guardar",
+          "saving": "Guardando...",
+          "toastSaved": "Límite de importación guardado",
+          "toastSaveFailed": "No se pudo guardar el límite de importación"
+        }
+      }
+    },
+    "it": {
+      "youtube": {
+        "playlistLimit": {
+          "title": "Limite di importazione playlist",
+          "description": "Numero massimo di brani scaricati durante l'importazione di una playlist YouTube, dalla libreria musicale o con !play su TeamSpeak/Discord.",
+          "maxTracks": "Brani max per importazione",
+          "hint": "I brani già presenti nella playlist non rientrano nel limite. Ciò che lo supera viene segnalato come ignorato e mai scaricato. 0 disattiva l'importazione.",
+          "save": "Salva",
+          "saving": "Salvataggio...",
+          "toastSaved": "Limite di importazione salvato",
+          "toastSaveFailed": "Impossibile salvare il limite di importazione"
+        }
+      }
+    }
+  }
+}

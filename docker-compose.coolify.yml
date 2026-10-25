@@ -9,8 +9,8 @@ services:
       - NODE_ENV=production
       - PORT=3001
       - DATABASE_URL=file:/app/packages/backend/data/ts6webui.db
-      - JWT_SECRET=${JWT_SECRET:?Set JWT_SECRET in Coolify environment variables}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
+      - "JWT_SECRET=${JWT_SECRET:?Set JWT_SECRET in Coolify environment variables}"
+      - "ENCRYPTION_KEY=${ENCRYPTION_KEY:?set ENCRYPTION_KEY in .env, different from JWT_SECRET - generate with openssl rand -hex 32}"
       - TS_ALLOW_SELF_SIGNED=${TS_ALLOW_SELF_SIGNED:-false}
       - JWT_ACCESS_EXPIRY=15m
       - JWT_REFRESH_EXPIRY=7d

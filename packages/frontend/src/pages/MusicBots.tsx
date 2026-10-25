@@ -11,7 +11,7 @@ import {
   useSetShuffle, useSetRepeat,
   usePlayFromQueue, useMoveQueueItem,
 } from '@/hooks/use-music-bots';
-import { useSongs, useUploadSong, useDeleteSong, useYouTubeSearch, useYouTubeDownload, useYouTubeInfo, useYouTubeDownloadBatch } from '@/hooks/use-music-library';
+import { useSongs, useUploadSong, useDeleteSong, useYouTubeSearch, useYouTubeDownload, useYouTubeInfo, useYouTubeDownloadBatch, useImportPlaylist, useImportPlaylistStatus } from '@/hooks/use-music-library';
 import { useRadioStations, useRadioPresets, useCreateRadioStation, useDeleteRadioStation, usePlayRadio } from '@/hooks/use-radio-stations';
 import { usePlaylists, usePlaylist, useCreatePlaylist, useDeletePlaylist, useAddSongToPlaylist, useRemoveSongFromPlaylist } from '@/hooks/use-playlists';
 import { useServers } from '@/hooks/use-servers';
@@ -740,6 +740,20 @@ function LibraryTab() {
 
   const ytInfo = useYouTubeInfo();
   const ytBatchDownload = useYouTubeDownloadBatch();
+  const qc = useQueryClient();
+  const importPlaylist = useImportPlaylist();
+  const [importJobId, setImportJobId] = useState<string | null>(null);
+  const { data: importJob, isError: importJobLost } = useImportPlaylistStatus(configId ?? null, importJobId);
+  // The status query has no onSuccess in v5 — bridge the "job just finished"
+  // transition to a library refresh here, once per job.
+  const invalidatedImportJobRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (importJobId && importJob?.status === 'done' && invalidatedImportJobRef.current !== importJobId) {
+      invalidatedImportJobRef.current = importJobId;
+      qc.invalidateQueries({ queryKey: ['songs', configId] });
+      qc.invalidateQueries({ queryKey: ['playlists'] });
+    }
+  }, [importJob?.status, importJobId, configId, qc]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -791,6 +805,17 @@ function LibraryTab() {
     });
   };
 
+  const handleImportPlaylist = () => {
+    if (!configId || !ytUrl.trim()) return;
+    importPlaylist.mutate({ configId, url: ytUrl.trim() }, {
+      onSuccess: (data: any) => {
+        setImportJobId(data.jobId);
+        toast.success(t('playlistImport.started', { name: data.playlistName, n: data.total }));
+      },
+      onError: (e: any) => toast.error(e?.response?.data?.error || t('playlistImport.failed')),
+    });
+  };
+
   const sourceIcon = (source: string) => {
     switch (source) {
       case 'youtube': return <Youtube className="h-3 w-3" />;
@@ -801,6 +826,7 @@ function LibraryTab() {
 
   const handleLoadUrl = () => {
     if (!ytUrl.trim() || !configId) return;
+    setImportJobId(null);
     ytInfo.mutate({ configId, url: ytUrl }, {
       onSuccess: (data: any) => {
         setUrlInfo(data);
@@ -815,7 +841,7 @@ function LibraryTab() {
   const handleBatchDownload = () => {
     if (!configId || !urlInfo) return;
     const ids = Array.from(selectedUrlIds);
-    const urls = ids.map((id) => `https://youtube.com/watch?v=${id}`);
+    const urls = ids.map((id) => `https://www.youtube.com/watch?v=${id}`);
     setBatchProgress(t('musicBots.library.downloadingProgress', { done: 0, total: urls.length }));
     ytBatchDownload.mutate({ configId, urls }, {
       onSuccess: (data: any) => {
@@ -885,7 +911,7 @@ function LibraryTab() {
               {t('musicBots.library.load')}
             </Button>
             {urlInfo && (
-              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setUrlInfo(null); setYtUrl(''); }}>
+              <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setUrlInfo(null); setYtUrl(''); setImportJobId(null); }}>
                 <X className="h-4 w-4" />
               </Button>
             )}
@@ -920,9 +946,39 @@ function LibraryTab() {
                         <><Download className="h-3 w-3 mr-1" /> {t('musicBots.library.downloadSelected', { n: selectedUrlIds.size })}</>
                       )}
                     </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleImportPlaylist}
+                      disabled={importPlaylist.isPending || (!importJobLost && importJob?.status === 'running')}
+                    >
+                      <Download className="h-3 w-3 mr-1" />
+                      {t('playlistImport.button')}
+                    </Button>
                   </div>
                 )}
               </div>
+              {importJobLost ? (
+                <div className="text-xs rounded-md border border-destructive/50 p-2 text-destructive">
+                  {t('playlistImport.lost')}
+                </div>
+              ) : importJob && (
+                <div className="text-xs space-y-1 rounded-md border border-border p-2">
+                  <div>
+                    {importJob.status === 'running'
+                      ? t('playlistImport.progress', { done: importJob.done, total: importJob.total })
+                      : t('playlistImport.done', { done: importJob.done })}
+                    {importJob.skipped > 0 && ` · ${t('playlistImport.skipped', { n: importJob.skipped })}`}
+                    {importJob.truncated > 0 && ` · ${t('playlistImport.truncated', { n: importJob.truncated })}`}
+                  </div>
+                  {importJob.failures?.length > 0 && (
+                    <ul className="text-destructive space-y-0.5">
+                      {importJob.failures.map((f: any) => (
+                        <li key={f.videoId}>• {f.title} — {f.reason}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
               <ScrollArea className="max-h-60">
                 {urlInfo.items.map((item) => (
                   <div
@@ -951,7 +1007,7 @@ function LibraryTab() {
                     </div>
                     {urlInfo.type === 'video' && (
                       <Button variant="default" size="sm" className="h-7 text-xs shrink-0"
-                        onClick={(e) => { e.stopPropagation(); handleYtDownload(`https://youtube.com/watch?v=${item.id}`); }}
+                        onClick={(e) => { e.stopPropagation(); handleYtDownload(`https://www.youtube.com/watch?v=${item.id}`); }}
                         disabled={ytDownload.isPending}
                       >
                         <Download className="h-3 w-3 mr-1" /> {t('musicBots.library.download')}
@@ -1006,7 +1062,7 @@ function LibraryTab() {
                     <p className="text-[10px] text-muted-foreground">{r.artist} - {formatTime(r.duration)}</p>
                   </div>
                   <Button variant="outline" size="sm" className="h-7 text-xs shrink-0"
-                    onClick={() => handleYtDownload(`https://youtube.com/watch?v=${r.id}`)}
+                    onClick={() => handleYtDownload(`https://www.youtube.com/watch?v=${r.id}`)}
                     disabled={ytDownload.isPending}
                   >
                     <Download className="h-3 w-3 mr-1" /> {t('musicBots.library.download')}

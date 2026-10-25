@@ -75,6 +75,11 @@ export const musicLibraryApi = {
     api.post(`/servers/${configId}/music-library/youtube/info`, { url }, { timeout: 60000 }).then((r) => r.data),
   youtubeDownloadBatch: (configId: number, urls: string[]) =>
     api.post(`/servers/${configId}/music-library/youtube/download-batch`, { urls }, { timeout: 600000 }).then((r) => r.data),
+  importPlaylist: (configId: number, url: string, musicBotId?: number) =>
+    api.post(`/servers/${configId}/music-library/youtube/import-playlist`, { url, musicBotId }, { timeout: 120000 })
+      .then((r) => r.data),
+  importPlaylistStatus: (configId: number, jobId: string) =>
+    api.get(`/servers/${configId}/music-library/import-playlist/${jobId}`).then((r) => r.data),
 };
 
 // === Radio Station API ===

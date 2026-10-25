@@ -418,7 +418,11 @@ Optional SP-initiated SAML 2.0 single sign-on that runs **alongside** local logi
 - SSH access to the TS server (only needed for bot flow event triggers)
 - `yt-dlp` and `ffmpeg` installed on the backend (included in the Docker image)
 
+## Troubleshooting
 
+### Lost access to the TeamSpeak server after an update
+
+If TS6 Manager suddenly cannot reach your TeamSpeak server — invalid API key, SSH login refused, timeouts, flood bans — the server update most likely expired the API key, regenerated the `serveradmin` password, or reset the query configuration. Follow the step-by-step recovery guide: **[Recovering access to your TeamSpeak server](docs/recover-server-access.md)**.
 
 ## License
 

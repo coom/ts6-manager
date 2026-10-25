@@ -418,7 +418,11 @@ Inicio de sesión único (SSO) SAML 2.0 opcional, iniciado por el SP, que funcio
 - Acceso SSH al servidor TS (solo necesario para los disparadores de eventos de flujos de bot)
 - `yt-dlp` y `ffmpeg` instalados en el backend (incluidos en la imagen Docker)
 
+## Solución de problemas
 
+### Acceso al servidor TeamSpeak perdido tras una actualización
+
+Si TS6 Manager de repente no puede conectar con su servidor TeamSpeak — clave de API inválida, inicio de sesión SSH rechazado, timeouts, bloqueos anti-flood — lo más probable es que la actualización del servidor haya hecho expirar la clave de API, regenerado la contraseña de `serveradmin` o restablecido la configuración query. Siga la guía de recuperación paso a paso: **[Recovering access to your TeamSpeak server](docs/recover-server-access.md)** (en inglés).
 
 ## Licencia
 

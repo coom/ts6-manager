@@ -1,6 +1,7 @@
 # syntax=docker/dockerfile:1.4
-# Node 20 reached end-of-life in April 2026 — track the active LTS line.
-FROM node:22-slim AS base
+# Node 20 reached end-of-life in April 2026. The eol job in CI fails 60 days
+# before this line does.
+FROM node:22-bookworm-slim AS base
 RUN corepack enable && corepack prepare pnpm@9 --activate
 WORKDIR /app
 
@@ -18,6 +19,8 @@ COPY --from=build /app/packages/frontend/dist /usr/share/nginx/html
 
 # Nginx config for SPA routing + API proxy (written as root, served as nginx)
 USER root
+# The base image lags behind Alpine's security updates.
+RUN apk upgrade --no-cache
 RUN printf 'server {\n\
     listen 8080;\n\
     server_name _;\n\

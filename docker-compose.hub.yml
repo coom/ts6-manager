@@ -9,16 +9,18 @@ services:
       - NODE_ENV=production
       - PORT=3001
       - DATABASE_URL=file:/app/packages/backend/data/ts6webui.db
-      - JWT_SECRET=${JWT_SECRET:?Set JWT_SECRET in .env or environment}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
+      - "JWT_SECRET=${JWT_SECRET:?Set JWT_SECRET in .env or environment}"
+      - "ENCRYPTION_KEY=${ENCRYPTION_KEY:?set ENCRYPTION_KEY in .env, different from JWT_SECRET - generate with openssl rand -hex 32}"
       - TS_ALLOW_SELF_SIGNED=${TS_ALLOW_SELF_SIGNED:-false}
       - YT_COOKIE_FILE=${YT_COOKIE_FILE:-}
       - JWT_ACCESS_EXPIRY=15m
       - JWT_REFRESH_EXPIRY=7d
+      # Must match the origin the browser actually uses — it is the CORS
+      # allow-list value. Set FRONTEND_URL in .env for anything but localhost.
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
       - MUSIC_DIR=/data/music
       - SIDECAR_URL=http://ts6-sidecar:9800
-      - SIDECAR_TOKEN=${SIDECAR_TOKEN:-}
+      - "SIDECAR_TOKEN=${SIDECAR_TOKEN:?set SIDECAR_TOKEN in .env - generate with openssl rand -hex 32}"
       - SIDECAR_BINARY_PATH=${SIDECAR_BINARY_PATH:-}
     volumes:
       - backend-data:/app/packages/backend/data
@@ -41,7 +43,7 @@ services:
       # Reachable by the backend over the internal bridge network only —
       # do not publish this port: the API has no per-user authentication.
       - SIDECAR_LISTEN_ADDR=0.0.0.0
-      - SIDECAR_TOKEN=${SIDECAR_TOKEN:-}
+      - "SIDECAR_TOKEN=${SIDECAR_TOKEN:?set SIDECAR_TOKEN in .env - generate with openssl rand -hex 32}"
     networks:
       - ts6-network
 
@@ -50,7 +52,9 @@ services:
     container_name: ts6-frontend
     restart: unless-stopped
     ports:
-      - "3000:8080"
+      # Host port is configurable so a deployment never has to patch this
+      # tracked file — set FRONTEND_PORT in .env instead.
+      - "${FRONTEND_PORT:-3000}:8080"
     depends_on:
       - backend
     networks:

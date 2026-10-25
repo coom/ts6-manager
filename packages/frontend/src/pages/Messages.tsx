@@ -36,9 +36,11 @@ export default function Messages() {
     { accessorKey: 'senderName', header: t('messages.columnFrom'), cell: ({ getValue }) => <span className="font-medium">{(getValue() as string) || '-'}</span> },
     { accessorKey: 'subject', header: t('messages.columnSubject') },
     { accessorKey: 'timestamp', header: t('messages.columnDate'), cell: ({ getValue }) => <span className="text-xs text-muted-foreground">{timeAgo(getValue() as number)}</span> },
+    // flag_read arrives from messagelist as a string, so "0" would read as true
+    // and render every message as already read. Coerce before testing.
     { accessorKey: 'flag_read', header: t('messages.columnStatus'), cell: ({ getValue }) => (
-      <span className={`text-xs px-1.5 py-0.5 rounded ${getValue() ? 'bg-muted text-muted-foreground' : 'bg-primary/20 text-primary font-medium'}`}>
-        {getValue() ? t('messages.statusRead') : t('messages.statusUnread')}
+      <span className={`text-xs px-1.5 py-0.5 rounded ${Number(getValue()) ? 'bg-muted text-muted-foreground' : 'bg-primary/20 text-primary font-medium'}`}>
+        {Number(getValue()) ? t('messages.statusRead') : t('messages.statusUnread')}
       </span>
     )},
     {

@@ -279,7 +279,17 @@
       "toastCookiesSaved": "Cookie salvati",
       "toastSaveFailed": "Salvataggio dei cookie non riuscito",
       "toastCookiesRemoved": "File dei cookie rimosso",
-      "toastRemoveFailed": "Rimozione dei cookie non riuscita"
+      "toastRemoveFailed": "Rimozione dei cookie non riuscita",
+      "playlistLimit": {
+        "title": "Limite di importazione playlist",
+        "description": "Numero massimo di brani scaricati durante l'importazione di una playlist YouTube, dalla libreria musicale o con !play su TeamSpeak/Discord.",
+        "maxTracks": "Brani max per importazione",
+        "hint": "I brani già presenti nella playlist non rientrano nel limite. Ciò che lo supera viene segnalato come ignorato e mai scaricato. 0 disattiva l'importazione.",
+        "save": "Salva",
+        "saving": "Salvataggio...",
+        "toastSaved": "Limite di importazione salvato",
+        "toastSaveFailed": "Impossibile salvare il limite di importazione"
+      }
     },
     "discord": {
       "title": "Integrazione Discord",
@@ -312,7 +322,7 @@
       "watchChannel": "Monitora un canale specifico",
       "wholeServer": "Intero server (connessione / disconnessione)",
       "watchChannelPlaceholder": "ID canale (o lascia vuoto per l'intero server)",
-      "watchChannelHint": "Vuoto = notifica alla connessione/disconnessione dal server. Impostato = notifica solo all'ingresso/uscita da quel canale.",
+      "watchChannelHint": "Vuoto = notifica alla connessione/disconnessione dal server, numero di connessi sull'intero server. Impostato = notifiche e conteggio limitati a quel canale. Il conteggio appare nel nickname del bot, bot musicali esclusi.",
       "joinMessage": "Messaggio di ingresso",
       "leaveMessage": "Messaggio di uscita",
       "templateVariables": "Variabili:",
@@ -1254,5 +1264,15 @@
       "moveDown": "Sposta giù",
       "removeTooltip": "Rimuovi dalla coda"
     }
+  },
+  "playlistImport": {
+    "button": "Importa playlist",
+    "started": "Importazione di «{{name}}» — {{n}} brano/i",
+    "progress": "Importazione… {{done}} di {{total}}",
+    "done": "Importazione completata — {{done}} brano/i aggiunto/i",
+    "skipped": "{{n}} già presente/i",
+    "truncated": "{{n}} oltre il limite",
+    "failed": "Importazione della playlist non riuscita",
+    "lost": "Tracciamento dell'importazione perso — l'operazione potrebbe essersi conclusa o il server è stato riavviato"
   }
 }

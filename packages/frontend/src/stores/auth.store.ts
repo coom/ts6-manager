@@ -15,6 +15,8 @@ interface AuthStore {
   user: UserInfo | null;
   setAuth: (accessToken: string, refreshToken: string, user: UserInfo) => void;
   setTokens: (accessToken: string, refreshToken: string) => void;
+  /** Correct the stored identity without touching tokens (see AppLayout). */
+  setUser: (user: UserInfo) => void;
   logout: () => void;
   isAuthenticated: () => boolean;
   isAdmin: () => boolean;
@@ -34,6 +36,7 @@ export const useAuthStore = create<AuthStore>()(
         set({ accessToken, refreshToken, user }),
       setTokens: (accessToken, refreshToken) =>
         set({ accessToken, refreshToken }),
+      setUser: (user) => set({ user }),
       logout: () =>
         set({ accessToken: null, refreshToken: null, user: null }),
       isAuthenticated: () => !!get().accessToken,

@@ -22,6 +22,14 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
   try {
     const payload = jwt.verify(token, config.jwtSecret, { algorithms: ['HS256'] }) as JwtPayload;
 
+    // MFA challenge and forced-password-change tokens are signed with the same
+    // secret but are issued after the password step *alone*. Without this check
+    // either one is accepted here as a full session, bypassing the second factor.
+    if (payload.typ !== 'access') {
+      res.status(401).json({ error: 'Invalid or expired token' });
+      return;
+    }
+
     // H4+M5: Lightweight DB check — verify user still exists, is enabled, and get fresh role
     const prisma = req.app.locals.prisma;
     prisma.user.findUnique({
@@ -32,8 +40,14 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
         res.status(401).json({ error: 'User account disabled or deleted' });
         return;
       }
-      // Use fresh role from DB instead of potentially stale JWT payload
-      req.user = { ...payload, role: user.role as JwtPayload['role'] };
+      // Build the identity explicitly rather than spreading the payload, so a
+      // claim the signer did not intend can never end up on req.user.
+      req.user = {
+        typ: 'access',
+        id: payload.id,
+        username: payload.username,
+        role: user.role as JwtPayload['role'], // fresh from the DB, not the stale JWT
+      };
       next();
     }).catch(() => {
       res.status(500).json({ error: 'Internal server error' });

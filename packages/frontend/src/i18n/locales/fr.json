@@ -279,7 +279,17 @@
       "toastCookiesSaved": "Cookies enregistrés",
       "toastSaveFailed": "Échec de l'enregistrement des cookies",
       "toastCookiesRemoved": "Fichier de cookies supprimé",
-      "toastRemoveFailed": "Échec de la suppression des cookies"
+      "toastRemoveFailed": "Échec de la suppression des cookies",
+      "playlistLimit": {
+        "title": "Limite d'import de playlist",
+        "description": "Nombre maximum de pistes récupérées lors de l'import d'une playlist YouTube, depuis la bibliothèque musicale ou via !play sur TeamSpeak/Discord.",
+        "maxTracks": "Pistes max par import",
+        "hint": "Les pistes déjà présentes dans la playlist ne comptent pas dans la limite. Ce qui la dépasse est signalé comme ignoré, jamais téléchargé. 0 désactive l'import.",
+        "save": "Enregistrer",
+        "saving": "Enregistrement...",
+        "toastSaved": "Limite d'import enregistrée",
+        "toastSaveFailed": "Échec de l'enregistrement de la limite d'import"
+      }
     },
     "discord": {
       "title": "Intégration Discord",
@@ -312,7 +322,7 @@
       "watchChannel": "Surveiller un salon spécifique",
       "wholeServer": "Tout le serveur (connexion / déconnexion)",
       "watchChannelPlaceholder": "ID du salon (ou laissez vide pour tout le serveur)",
-      "watchChannelHint": "Vide = notifier à la connexion/déconnexion du serveur. Défini = notifier uniquement à l'entrée/sortie de ce salon.",
+      "watchChannelHint": "Vide = notifier à la connexion/déconnexion du serveur, compteur de connectés sur tout le serveur. Défini = notifications limitées à ce salon et compteur limité à ce salon. Le compteur s'affiche dans le pseudo du bot, bots musicaux exclus.",
       "joinMessage": "Message d'arrivée",
       "leaveMessage": "Message de départ",
       "templateVariables": "Variables :",
@@ -1254,5 +1264,15 @@
       "moveDown": "Descendre",
       "removeTooltip": "Retirer de la file d'attente"
     }
+  },
+  "playlistImport": {
+    "button": "Importer la playlist",
+    "started": "Import de « {{name}} » — {{n}} piste(s)",
+    "progress": "Import en cours… {{done}} sur {{total}}",
+    "done": "Import terminé — {{done}} piste(s) ajoutée(s)",
+    "skipped": "{{n}} déjà présente(s)",
+    "truncated": "{{n}} au-delà de la limite",
+    "failed": "Échec de l'import de la playlist",
+    "lost": "Suivi de l'import perdu — l'opération est peut-être terminée ou le serveur a redémarré"
   }
 }

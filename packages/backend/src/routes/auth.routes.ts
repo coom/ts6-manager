@@ -32,17 +32,17 @@ export function requirePasswordHash(passwordHash: string | null): string {
 // Short-lived token proving the password step passed, scoped to the MFA step.
 function verifyMfaChallenge(token: string): number {
   const payload = jwt.verify(token, config.jwtSecret, { algorithms: ['HS256'] }) as any;
-  if (!payload?.mfa || !payload.id) throw new AppError(401, 'Invalid MFA session');
+  if (payload?.typ !== 'mfa' || !payload.mfa || !payload.id) throw new AppError(401, 'Invalid MFA session');
   return payload.id;
 }
 
 // Short-lived token proving auth fully passed, scoped to the forced password change.
 function signChangeToken(userId: number): string {
-  return jwt.sign({ pwchange: true, id: userId }, config.jwtSecret, { expiresIn: '10m' } as jwt.SignOptions);
+  return jwt.sign({ typ: 'pwchange', pwchange: true, id: userId }, config.jwtSecret, { expiresIn: '10m' } as jwt.SignOptions);
 }
 function verifyChangeToken(token: string): number {
   const payload = jwt.verify(token, config.jwtSecret, { algorithms: ['HS256'] }) as any;
-  if (!payload?.pwchange || !payload.id) throw new AppError(401, 'Invalid session');
+  if (payload?.typ !== 'pwchange' || !payload.pwchange || !payload.id) throw new AppError(401, 'Invalid session');
   return payload.id;
 }
 
@@ -265,7 +265,7 @@ authRoutes.post('/refresh', async (req: Request, res: Response, next) => {
     // Delete old token after creating new one (deleteMany: no throw if gone)
     await prisma.refreshToken.deleteMany({ where: { id: stored.id } });
 
-    const payload = { id: stored.user.id, username: stored.user.username, role: stored.user.role };
+    const payload = { typ: 'access', id: stored.user.id, username: stored.user.username, role: stored.user.role };
     const accessToken = jwt.sign(payload, config.jwtSecret, { expiresIn: config.jwtAccessExpiry } as jwt.SignOptions);
 
     res.json({ accessToken, refreshToken: newRefreshToken });
@@ -366,9 +366,32 @@ authRoutes.put('/language', authMiddleware, async (req: Request, res: Response, 
 
 // Start enrollment: generate a pending secret + QR. Allowed either with a
 // normal session or with an MFA challenge token (admin-forced first setup).
+/**
+ * User id from a Bearer access token, or null.
+ *
+ * These routes are on the public /api/auth mount, so authMiddleware has not run
+ * and req.user is always unset — which made self-service enrolment from the
+ * Account tab fail with 401 no matter what. Resolving the token here restores
+ * it without forcing authMiddleware onto the routes, which would break the
+ * admin-forced first setup (an mfaToken, with no session to present yet).
+ *
+ * Only `typ === 'access'` is accepted, so an MFA challenge token cannot be
+ * replayed here to enrol a *new* authenticator with the password alone.
+ */
+function accessTokenUserId(req: Request): number | null {
+  const header = req.headers.authorization;
+  if (!header?.startsWith('Bearer ')) return null;
+  try {
+    const payload = jwt.verify(header.substring(7), config.jwtSecret, { algorithms: ['HS256'] }) as any;
+    return payload?.typ === 'access' && payload.id ? payload.id : null;
+  } catch {
+    return null;
+  }
+}
+
 async function resolveEnrollUser(req: Request): Promise<{ prisma: any; user: any }> {
   const prisma = req.app.locals.prisma;
-  let userId = req.user?.id;
+  let userId = req.user?.id ?? accessTokenUserId(req);
   if (!userId && req.body?.mfaToken) userId = verifyMfaChallenge(req.body.mfaToken);
   if (!userId) throw new AppError(401, 'Authentication required');
   const user = await prisma.user.findUnique({ where: { id: userId } });

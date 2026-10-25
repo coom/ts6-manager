@@ -48,6 +48,8 @@ export class EventBridge extends EventEmitter {
       port: serverConfig.sshPort,
       username: serverConfig.sshUsername,
       password: decrypt(serverConfig.sshPassword),
+      hostKeyFingerprint: serverConfig.sshHostKeyFp,
+      onHostKeyPinned: (fp) => this.persistHostKey(configId, fp),
     });
 
     client.on('ready', async () => {
@@ -128,6 +130,15 @@ export class EventBridge extends EventEmitter {
 
   private commandListeners: Map<string, SshQueryClient> = new Map();
 
+  /** Store a first-seen host key so a later change is detected, not trusted. */
+  private persistHostKey(configId: number, fingerprint: string): void {
+    this.prisma.tsServerConfig
+      .update({ where: { id: configId }, data: { sshHostKeyFp: fingerprint } })
+      .catch((err: any) => {
+        console.error(`[EventBridge] Failed to persist SSH host key for config ${configId}: ${err.message}`);
+      });
+  }
+
   private makeCmdKey(configId: number, sid: number, channelId: number): string {
     return `${configId}:${sid}:cmd:${channelId}`;
   }
@@ -144,6 +155,8 @@ export class EventBridge extends EventEmitter {
       port: serverConfig.sshPort,
       username: serverConfig.sshUsername,
       password: decrypt(serverConfig.sshPassword),
+      hostKeyFingerprint: serverConfig.sshHostKeyFp,
+      onHostKeyPinned: (fp) => this.persistHostKey(configId, fp),
     });
 
     client.on('ready', async () => {

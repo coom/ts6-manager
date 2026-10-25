@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import { randomBytes } from 'crypto';
 import { Ts3Client, type Ts3ClientOptions, generateIdentity, type IdentityData, buildCommand } from './tslib/index.js';
 import { AudioPipeline, FRAME_MS, BYTES_PER_FRAME } from './audio/pipeline.js';
 import { PlayQueue, type QueueItem } from './playlist/queue.js';
@@ -7,12 +8,21 @@ import { StreamSignaling, type ActiveStream, type SignalingMessage } from './str
 import { SidecarClient } from './streaming/sidecar-client.js';
 import { SidecarProcess, type SidecarConfig } from './streaming/sidecar-process.js';
 import { STREAM_PRESETS, DEFAULT_PRESET, type VideoViewerInfo, type VideoStreamStatus } from './streaming/types.js';
-import { getCookieArgs, runYtDlp } from './audio/youtube.js';
+import { getCookieArgs, runYtDlp, assertSafeUrl } from './audio/youtube.js';
+import { validateUrl } from '../utils/url-validator.js';
 
 /** Resolve a YouTube/yt-dlp-compatible URL to a direct stream URL */
 async function resolveVideoUrl(url: string, maxHeight: number = 720): Promise<string> {
+  assertSafeUrl(url);
+
   // Only resolve YouTube and other yt-dlp-supported sites
   if (!url.includes('youtube.com/') && !url.includes('youtu.be/') && !url.includes('twitch.tv/')) {
+    // Anything else goes straight to the sidecar's ffmpeg, so apply the same
+    // SSRF guard the radio path uses before handing a URL to a fetcher.
+    const check = await validateUrl(url, { allowedProtocols: ['http:', 'https:'] });
+    if (!check.valid) {
+      throw new Error(`Video source blocked: ${check.error}`);
+    }
     return url;
   }
 
@@ -25,6 +35,7 @@ async function resolveVideoUrl(url: string, maxHeight: number = 720): Promise<st
     '-f', formatFilter,
     '--no-playlist',
     '-g',  // print direct URL only
+    '--',  // nothing past this point is parsed as an option
     url,
   ], 60_000, { lowPriority: false });
 
@@ -903,12 +914,20 @@ export class VoiceBot extends EventEmitter {
     const sidecarUrl = process.env.SIDECAR_URL;
 
     if (sidecarUrl) {
-      // Docker mode: sidecar is an external service, don't spawn it
+      // Docker mode: the sidecar is a separate container, so the shared secret
+      // has to be configured on both sides. The sidecar refuses to start
+      // without it; fail here with a message that names the variable.
+      if (!process.env.SIDECAR_TOKEN) {
+        throw new Error('SIDECAR_TOKEN must be set when SIDECAR_URL is used (shared secret for the media API)');
+      }
       this.sidecarHttp = new SidecarClient(sidecarUrl);
     } else {
-      // Local mode: spawn sidecar binary
+      // Local mode: spawn the sidecar binary. Mint a per-spawn token so the
+      // media API is authenticated with no configuration required.
+      const sidecarToken = process.env.SIDECAR_TOKEN || randomBytes(32).toString('hex');
       const sidecarConfig: SidecarConfig = {
         binaryPath: sidecarBinary,
+        token: sidecarToken,
         port: sidecarPort,
         videoBitrate: effectiveBitrate,
         videoResolution: { width: presetConfig.width, height: presetConfig.height },
@@ -932,7 +951,7 @@ export class VoiceBot extends EventEmitter {
         this.sidecarProc = null;
         throw new Error(`Failed to start sidecar: ${err.message}`, { cause: err });
       }
-      this.sidecarHttp = new SidecarClient(sidecarPort);
+      this.sidecarHttp = new SidecarClient(sidecarPort, sidecarToken);
     }
 
     // Wait for sidecar to be healthy

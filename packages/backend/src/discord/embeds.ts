@@ -1,4 +1,5 @@
 import type { QueueItem } from '../voice/playlist/queue.js';
+import { chunkLyrics } from '../voice/lyrics.js';
 
 /**
  * Pure Discord embed builders (plain APIEmbed-compatible objects), kept free
@@ -115,6 +116,15 @@ export function queueEmbed(items: QueueItem[], currentIndex: number) {
     title: `File d'attente (${items.length} piste${items.length > 1 ? 's' : ''})`,
     description: lines.join('\n'),
   };
+}
+
+export function lyricsEmbeds(artist: string, title: string, lyrics: string) {
+  const heading = `🎤 ${artist ? `${artist} — ` : ''}${title}`;
+  return chunkLyrics('', lyrics, 4096).map((chunk, i) => ({
+    color: COLORS.purple,
+    ...(i === 0 ? { title: heading } : {}),
+    description: chunk,
+  }));
 }
 
 export function formatDuration(seconds: number): string {

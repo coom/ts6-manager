@@ -1,0 +1,36 @@
+name: Sync upstream
+
+on:
+  schedule:
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Merge upstream into sync branch
+        run: |
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git remote add upstream https://github.com/coom/ts6-manager.git
+          git fetch upstream main
+          if git merge-base --is-ancestor upstream/main origin/main; then
+            echo "Already up to date"; exit 0
+          fi
+          git checkout -B sync-upstream origin/main
+          git merge upstream/main -m "chore: sync upstream" || { git merge --abort; echo "Merge conflict - manual sync needed"; exit 1; }
+          git push origin sync-upstream --force
+      - name: Open PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git ls-remote --exit-code origin sync-upstream >/dev/null 2>&1 || exit 0
+          gh pr create --base main --head sync-upstream --title "chore: sync upstream" --body "Automatischer Sync von coom/ts6-manager" || true

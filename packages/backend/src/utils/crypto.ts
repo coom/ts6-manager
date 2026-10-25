@@ -10,18 +10,14 @@ let encryptionKey: Buffer | null = null;
 function getKey(): Buffer {
   if (encryptionKey) return encryptionKey;
 
-  const source = process.env.ENCRYPTION_KEY || config.jwtSecret;
-  if (!process.env.ENCRYPTION_KEY) {
-    // The startup guard in index.ts already aborts in production; this
-    // fallback only remains for development convenience.
-    if (config.nodeEnv === 'production') {
-      throw new Error('ENCRYPTION_KEY is required in production');
-    }
-    console.warn('[WARN] ENCRYPTION_KEY not set. Using JWT_SECRET as fallback for field encryption. Set ENCRYPTION_KEY in production!');
-  }
-
-  // Derive a 32-byte key using scrypt
-  encryptionKey = scryptSync(source, SALT, 32);
+  // config.encryptionKey is mandatory and validated at startup, so there is no
+  // fallback to JWT_SECRET: deriving the at-rest key from the signing key made
+  // one leak decrypt every stored ServerQuery key, SSH password and TOTP secret.
+  //
+  // SALT stays a fixed constant on purpose — changing it would make existing
+  // ciphertext undecryptable. Its job was to stop cross-install precomputation,
+  // which a mandatory high-entropy ENCRYPTION_KEY already rules out.
+  encryptionKey = scryptSync(config.encryptionKey, SALT, 32);
   return encryptionKey;
 }
 

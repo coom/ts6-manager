@@ -53,6 +53,12 @@ export interface ValidateUrlResult {
 /**
  * Validate a URL for safety against SSRF attacks.
  * Blocks private IPs, cloud metadata endpoints, and non-HTTP protocols.
+ *
+ * This checks only the URL it is handed. A 3xx Location can still walk an
+ * outbound request onto an internal address, so a caller fetching a
+ * user-supplied URL must either refuse redirects (axios `maxRedirects: 0`) or
+ * re-validate every hop — as fetchIcyMetadata does inside its redirect loop.
+ * Do not "tidy away" a `maxRedirects: 0` in this codebase; it is load-bearing.
  */
 export async function validateUrl(
   url: string,

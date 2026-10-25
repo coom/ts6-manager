@@ -4,6 +4,14 @@ on:
   push:
     branches: [main, security-hardening]
   pull_request:
+  # Advisories are published without any push, and GitHub refuses to re-run a
+  # run older than a month: re-audit weekly, and allow a manual run.
+  schedule:
+    - cron: '23 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   node:
@@ -46,7 +54,7 @@ jobs:
         run: pnpm run build
 
   sidecar:
-    name: Build and vet Go sidecar
+    name: Build, vet and scan Go sidecar
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -65,20 +73,74 @@ jobs:
       - name: Vet
         run: go vet ./...
 
+      # Fails only on vulnerabilities the code reaches. go.mod's go directive is
+      # the security floor: a stdlib finding means raising it to the fixed patch.
+      - name: Vulnerability check
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...
+
+  eol:
+    name: Runtime end of life
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Check end-of-life dates
+        run: node .github/scripts/check-eol.mjs
+
   docker:
-    name: Build Docker images
+    name: Build and scan Docker images
     runs-on: ubuntu-latest
     strategy:
+      # Every image gets scanned, even when another one has findings.
+      fail-fast: false
       matrix:
-        dockerfile: [Dockerfile.backend, Dockerfile.frontend, Dockerfile.sidecar]
+        image: [backend, frontend, sidecar]
     steps:
       - uses: actions/checkout@v5
 
       - uses: docker/setup-buildx-action@v3
 
-      - name: Build ${{ matrix.dockerfile }}
+      - name: Build Dockerfile.${{ matrix.image }}
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: ${{ matrix.dockerfile }}
+          file: Dockerfile.${{ matrix.image }}
           push: false
+          load: true
+          tags: ts6-manager-${{ matrix.image }}:ci
+
+      # From the release archive, not aquasecurity/trivy-action: that action's
+      # tags were rewritten to steal CI secrets in March 2026. The checksum pins
+      # the exact archive.
+      - name: Install Trivy
+        env:
+          TRIVY_VERSION: 0.75.0
+          TRIVY_SHA256: c6e65abddb348e25f10549df887045629cf28cc72453cd1c63acb717316b3f3f
+        working-directory: ${{ runner.temp }}
+        run: |
+          curl -fsSLo trivy.tar.gz "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          echo "${TRIVY_SHA256}  trivy.tar.gz" | sha256sum -c -
+          tar -xzf trivy.tar.gz trivy
+
+      # Retried: a registry hiccup would otherwise turn the run red with nothing to fix.
+      - name: Download vulnerability database
+        run: |
+          for attempt in 1 2 3; do
+            "$RUNNER_TEMP/trivy" image --download-db-only --no-progress --disable-telemetry --skip-version-check && exit 0
+            [ "$attempt" -lt 3 ] && sleep $((attempt * 20))
+          done
+          exit 1
+
+      # System packages only: npm and Go dependencies are audited by the jobs
+      # above, with reachability and justified ignores. An unfixed CVE gives
+      # nothing to act on.
+      - name: Scan system packages
+        run: >
+          "$RUNNER_TEMP/trivy" image --scanners vuln --pkg-types os
+          --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --no-progress
+          --skip-db-update --disable-telemetry --skip-version-check
+          ts6-manager-${{ matrix.image }}:ci

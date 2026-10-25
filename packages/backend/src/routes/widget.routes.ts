@@ -6,6 +6,11 @@ import { widgetDataCache } from './widget-public.routes.js';
 
 export const widgetRoutes: Router = Router();
 
+// Each row carries the widget `token`, which is the only credential guarding the
+// unauthenticated /api/widget/:token/* endpoints. Listing it to any logged-in
+// user would hand out cross-server read access, so the whole router is admin-only.
+widgetRoutes.use(requireRole('admin'));
+
 // GET / — List all widgets
 widgetRoutes.get('/', async (req: Request, res: Response, next) => {
   try {

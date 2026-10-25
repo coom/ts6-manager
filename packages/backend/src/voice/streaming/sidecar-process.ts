@@ -8,6 +8,8 @@ import { EventEmitter } from 'events';
 
 export interface SidecarConfig {
   binaryPath: string;
+  /** Shared secret for the sidecar's HTTP API. The sidecar refuses to start without one. */
+  token: string;
   port?: number;
   ffmpegPath?: string;
   stunServers?: string[];
@@ -34,6 +36,9 @@ export class SidecarProcess extends EventEmitter {
     const env: Record<string, string> = {
       ...(process.env as Record<string, string>),
       SIDECAR_PORT: String(port),
+      // Generated per spawn by the caller, so the local media API is never open
+      // even when the operator has set no SIDECAR_TOKEN.
+      SIDECAR_TOKEN: this.config.token,
     };
 
     if (this.config.ffmpegPath) env.FFMPEG_PATH = this.config.ffmpegPath;

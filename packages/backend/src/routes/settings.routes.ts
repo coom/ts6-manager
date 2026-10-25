@@ -9,6 +9,7 @@ import fs from 'fs';
 import path from 'path';
 import { AppError } from '../middleware/error-handler.js';
 import { setYtCookieFile, getYtCookieFile } from '../voice/audio/youtube.js';
+import { MAX_PLAYLIST_IMPORT_KEY, parseImportCap } from '../utils/app-settings.js';
 
 const settingsRoutes: Router = Router();
 
@@ -118,6 +119,33 @@ settingsRoutes.put('/proxy', requireAdmin, async (req: Request, res: Response, n
     });
     applyTrustProxy(req.app, hops);
     res.json({ trustHops: hops });
+  } catch (err) { next(err); }
+});
+
+// GET /limits — tunable ceilings
+settingsRoutes.get('/limits', requireAdmin, async (req: Request, res: Response, next) => {
+  try {
+    const row = await req.app.locals.prisma.appSetting.findUnique({
+      where: { key: MAX_PLAYLIST_IMPORT_KEY },
+    });
+    res.json({ maxPlaylistImport: parseImportCap(row?.value) });
+  } catch (err) { next(err); }
+});
+
+// PUT /limits
+settingsRoutes.put('/limits', requireAdmin, async (req: Request, res: Response, next) => {
+  try {
+    const value = Number(req.body?.maxPlaylistImport);
+    if (!Number.isFinite(value) || value < 0 || value > 1000) {
+      throw new AppError(400, 'maxPlaylistImport must be between 0 and 1000');
+    }
+    const stored = String(Math.floor(value));
+    await req.app.locals.prisma.appSetting.upsert({
+      where: { key: MAX_PLAYLIST_IMPORT_KEY },
+      update: { value: stored },
+      create: { key: MAX_PLAYLIST_IMPORT_KEY, value: stored },
+    });
+    res.json({ maxPlaylistImport: Math.floor(value) });
   } catch (err) { next(err); }
 });
 

@@ -16,6 +16,7 @@ import type {
 import axios from 'axios';
 import { validateUrl } from '../utils/url-validator.js';
 import { ALLOWED_WEBQUERY_COMMANDS } from './command-whitelist.js';
+import { broadcastScoped } from '../ws/ws-broadcast.js';
 import crypto from 'crypto';
 
 const MAX_NODE_VISITS = 100;
@@ -78,7 +79,7 @@ export class FlowRunner {
       flowId: flow.id,
       executionId: execution.id,
       triggeredBy: triggerType,
-    });
+    }, flow.serverConfigId);
 
     const startTime = Date.now();
 
@@ -112,7 +113,7 @@ export class FlowRunner {
         flowId: flow.id,
         executionId: execution.id,
         duration: Date.now() - startTime,
-      });
+      }, flow.serverConfigId);
     } catch (err: any) {
       await this.log(ctx, null, 'error', `Flow execution failed: ${err.message}`);
 
@@ -125,7 +126,7 @@ export class FlowRunner {
         flowId: flow.id,
         executionId: execution.id,
         error: err.message,
-      });
+      }, flow.serverConfigId);
     }
   }
 
@@ -422,6 +423,8 @@ export class FlowRunner {
       headers,
       data: body ? JSON.parse(body) : undefined,
       timeout: 10000,
+      // Load-bearing: validateUrl only vetted the initial host, so a 3xx
+      // Location could still redirect this request at an internal address.
       maxRedirects: 0,
     });
     if (data.storeAs) {
@@ -465,6 +468,8 @@ export class FlowRunner {
       headers,
       data: body ? JSON.parse(body) : undefined,
       timeout: 15000,
+      // Load-bearing: validateUrl only vetted the initial host, so a 3xx
+      // Location could still redirect this request at an internal address.
       maxRedirects: 0,
       transformResponse: [(data) => data], // Return raw response, don't auto-parse JSON
     });
@@ -833,13 +838,8 @@ export class FlowRunner {
     }
   }
 
-  private broadcast(type: string, payload: any): void {
-    const msg = JSON.stringify({ type, ...payload });
-    this.wss.clients.forEach(client => {
-      if (client.readyState === 1) { // WebSocket.OPEN
-        client.send(msg);
-      }
-    });
+  private broadcast(type: string, payload: any, serverConfigId?: number | null): void {
+    broadcastScoped(this.wss, type, payload, serverConfigId);
   }
 
   private async executeGenerateCode(data: any, ctx: ExecutionContext): Promise<void> {

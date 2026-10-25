@@ -225,6 +225,7 @@ export class Ts3Client extends EventEmitter {
     this.pingTimer = null;
     this.socket?.close();
     this.socket = null;
+    this.clientId = 0; // the server may reassign this clid to someone else
   }
 
   disconnect(): void {
@@ -247,6 +248,7 @@ export class Ts3Client extends EventEmitter {
     this.pingTimer = null;
     this.socket?.close();
     this.socket = null;
+    this.clientId = 0; // the server may reassign this clid to someone else
     this.emit("disconnected");
   }
 

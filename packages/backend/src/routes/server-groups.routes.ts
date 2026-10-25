@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { requireRole } from '../middleware/rbac.js';
+import { filterRegularServerGroups } from '../utils/server-group-filter.js';
 import type { ConnectionPool } from '../ts-client/connection-pool.js';
 
 export const serverGroupRoutes: Router = Router({ mergeParams: true });
@@ -11,7 +12,7 @@ const getClient = (req: Request) => {
 const getSid = (req: Request) => parseInt(String(req.params.sid));
 
 serverGroupRoutes.get('/', async (req: Request, res: Response, next) => {
-  try { res.json(await getClient(req).execute(getSid(req), 'servergrouplist')); } catch (err) { next(err); }
+  try { res.json(filterRegularServerGroups(await getClient(req).execute(getSid(req), 'servergrouplist'))); } catch (err) { next(err); }
 });
 
 serverGroupRoutes.post('/', requireRole('admin'), async (req: Request, res: Response, next) => {

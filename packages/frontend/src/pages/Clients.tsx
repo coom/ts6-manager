@@ -62,8 +62,11 @@ export default function Clients() {
         accessorKey: 'client_away',
         header: t('clients.status'),
         cell: ({ row }) => {
-          if (row.original.client_away) return <Badge variant="warning" className="text-[10px]">{t('clients.away')}</Badge>;
-          if (row.original.client_input_muted) return <Badge variant="secondary" className="text-[10px]">{t('clients.muted')}</Badge>;
+          // WebQuery returns every field as a string, and "0" is truthy — without
+          // Number() every connected client badges as away, permanently. Same
+          // coercion Channels.tsx already applies to its flag columns.
+          if (Number(row.original.client_away)) return <Badge variant="warning" className="text-[10px]">{t('clients.away')}</Badge>;
+          if (Number(row.original.client_input_muted)) return <Badge variant="secondary" className="text-[10px]">{t('clients.muted')}</Badge>;
           return <Badge variant="success" className="text-[10px]">{t('clients.active')}</Badge>;
         },
       },

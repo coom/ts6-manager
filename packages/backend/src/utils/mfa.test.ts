@@ -35,7 +35,8 @@ describe('recovery codes', () => {
     const { plain, hashed } = generateRecoveryCodes();
     expect(plain).toHaveLength(10);
     expect(hashed).toHaveLength(10);
-    expect(plain[0]).toMatch(/^[0-9a-f]{4}-[0-9a-f]{4}$/);
+    // 16 hex chars (64 bits) in four groups: a1b2-c3d4-e5f6-a7b8
+    expect(plain[0]).toMatch(/^[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}$/);
   });
 
   it('consumes a valid code once and rejects reuse', () => {

@@ -6,6 +6,7 @@ import {
   nowPlayingEmbed,
   statsEmbed,
   queueEmbed,
+  lyricsEmbeds,
   formatDuration,
   formatUptime,
   formatBytes,
@@ -88,5 +89,24 @@ describe('templates AFK par défaut', () => {
   it('rend le template back avec le pseudo', () => {
     const msg = renderTemplate(DEFAULT_BACK_TEMPLATE, { user: 'Bob', channel: 'Lobby', totalMembers: 3, action: '✅' });
     expect(msg).toBe('✅ Bob est de retour');
+  });
+});
+
+describe('lyricsEmbeds', () => {
+  it('puts the 🎤 title on the first embed only', () => {
+    const embeds = lyricsEmbeds('Queen', 'Bohemian Rhapsody', 'line\n'.repeat(1000));
+    expect(embeds.length).toBeGreaterThan(1);
+    expect(embeds[0].title).toBe('🎤 Queen — Bohemian Rhapsody');
+    expect(embeds[1].title).toBeUndefined();
+  });
+
+  it('keeps every description within the 4096-char embed limit', () => {
+    const embeds = lyricsEmbeds('A', 'B', 'x'.repeat(10_000));
+    for (const e of embeds) expect(e.description.length).toBeLessThanOrEqual(4096);
+  });
+
+  it('omits the artist when unknown', () => {
+    const embeds = lyricsEmbeds('', 'Title', 'some lyrics');
+    expect(embeds[0].title).toBe('🎤 Title');
   });
 });

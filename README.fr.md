@@ -417,7 +417,11 @@ Authentification unique SAML 2.0 initiée par le SP (optionnelle), fonctionnant 
 - Accès SSH au serveur TS (uniquement nécessaire pour les déclencheurs d'événements dans les flux de bots)
 - `yt-dlp` et `ffmpeg` installés sur le backend (inclus dans l'image Docker)
 
+## Dépannage
 
+### Accès au serveur TeamSpeak perdu après une mise à jour
+
+Si TS6 Manager ne parvient soudainement plus à joindre votre serveur TeamSpeak — clé API invalide, connexion SSH refusée, timeouts, bannissements anti-flood — la mise à jour du serveur a probablement fait expirer la clé API, régénéré le mot de passe `serveradmin` ou réinitialisé la configuration query. Suivez le guide de récupération pas à pas : **[Récupérer l'accès à votre serveur TeamSpeak](docs/recover-server-access.fr.md)**.
 
 ## Licence
 

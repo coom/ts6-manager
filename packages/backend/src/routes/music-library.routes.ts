@@ -27,13 +27,14 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
+  defParamCharset: 'utf8',
   limits: { fileSize: MAX_FILE_SIZE },
   fileFilter: (_req, file, cb) => {
     const ext = path.extname(file.originalname).toLowerCase();
     if (ALLOWED_EXTENSIONS.includes(ext)) {
       cb(null, true);
     } else {
-      cb(new Error(`Unsupported file type: ${ext}`));
+      cb(new AppError(400, `Unsupported file type: ${ext}`));
     }
   },
 });
@@ -215,6 +216,47 @@ musicLibraryRoutes.post('/youtube/download-batch', async (req: Request, res: Res
     }
 
     res.json({ results, errors, total: urls.length, downloaded: results.length });
+  } catch (err) { next(err); }
+});
+
+// POST /youtube/import-playlist — import a whole YouTube playlist
+musicLibraryRoutes.post('/youtube/import-playlist', async (req: Request, res: Response, next) => {
+  try {
+    const configId = parseInt(String(req.params.configId));
+    const { url, musicBotId } = req.body;
+    if (!url) throw new AppError(400, 'url is required');
+
+    const importer = req.app.locals.playlistImporter;
+    const result = await importer.start({
+      url: String(url),
+      serverConfigId: configId,
+      musicBotId: musicBotId != null ? parseInt(String(musicBotId)) : null,
+    });
+
+    if (result.kind === 'busy') {
+      throw new AppError(409, 'An import is already running for this server');
+    }
+    if (result.kind === 'not-a-playlist') {
+      throw new AppError(400, 'That URL is not a YouTube playlist');
+    }
+
+    res.status(202).json({
+      jobId: result.job.jobId,
+      playlistId: result.job.playlistId,
+      playlistName: result.job.playlistName,
+      total: result.job.total,
+      skipped: result.job.skipped,
+      truncated: result.job.truncated,
+    });
+  } catch (err) { next(err); }
+});
+
+// GET /import-playlist/:jobId — poll import progress
+musicLibraryRoutes.get('/import-playlist/:jobId', (req: Request, res: Response, next) => {
+  try {
+    const job = req.app.locals.playlistImporter.get(String(req.params.jobId));
+    if (!job) throw new AppError(404, 'Import job not found');
+    res.json(job);
   } catch (err) { next(err); }
 });
 

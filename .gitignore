@@ -16,3 +16,8 @@ packages/backend/data/
 packages/backend/prisma/migrations/
 .claude/
 build-and-push.ps1
+
+# Compiled Go sidecar — build output, never committed. A binary in the repo is
+# unreviewable; build it from packages/sidecar/ instead.
+packages/sidecar/ts6-media-sidecar
+packages/sidecar/ts6-media-sidecar.exe

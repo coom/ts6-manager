@@ -12,6 +12,7 @@ import type {
 } from '@ts6/common';
 import { AnimationManager } from './animation-manager.js';
 import type { AnimationConfig } from './animation-manager.js';
+import { broadcastScoped } from '../ws/ws-broadcast.js';
 import crypto from 'crypto';
 
 /**
@@ -818,12 +819,8 @@ export class BotEngine {
     }
   }
 
+  /** Engine lifecycle events are instance-wide, so they stay admin-only. */
   private broadcast(type: string, payload: any): void {
-    const msg = JSON.stringify({ type, ...payload });
-    this.wss.clients.forEach(client => {
-      if (client.readyState === 1) { // WebSocket.OPEN
-        client.send(msg);
-      }
-    });
+    broadcastScoped(this.wss, type, payload);
   }
 }

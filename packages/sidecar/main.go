@@ -1022,26 +1022,31 @@ func (s *Sidecar) Stop() {
 var peerIDRe = regexp.MustCompile(`^[A-Za-z0-9._-]{1,128}$`)
 var bitrateRe = regexp.MustCompile(`^[0-9]{1,6}[kKmM]?$`)
 
-// validSource accepts an empty source (test pattern), an http(s) URL, or a
-// local path. Anything starting with '-' is rejected so a malicious source
-// cannot be parsed as an extra FFmpeg flag.
+// validSource accepts an empty source (test pattern) or an http(s) URL, nothing
+// else. A leading '-' would be parsed as an extra FFmpeg flag; any other
+// non-http(s) value is a local path or an FFmpeg protocol (file:, concat:,
+// subfile:) that would let a caller relay host files to stream viewers.
 func validSource(source string) bool {
 	if source == "" {
 		return true
 	}
-	if strings.HasPrefix(source, "http://") || strings.HasPrefix(source, "https://") {
-		_, err := url.Parse(source)
-		return err == nil
+	if strings.HasPrefix(source, "-") {
+		return false
 	}
-	return !strings.HasPrefix(source, "-")
+	if !strings.HasPrefix(source, "http://") && !strings.HasPrefix(source, "https://") {
+		return false
+	}
+	_, err := url.Parse(source)
+	return err == nil
 }
 
-// secureAPI caps request bodies and, when a token is configured, requires
-// "Authorization: Bearer <token>" on every endpoint except /health.
+// secureAPI caps request bodies and requires "Authorization: Bearer <token>"
+// on every endpoint except /health. The token is never empty — main() aborts
+// first — so there is deliberately no unauthenticated path through here.
 func secureAPI(token string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
-		if token != "" && r.URL.Path != "/health" {
+		if r.URL.Path != "/health" {
 			expected := "Bearer " + token
 			if subtle.ConstantTimeCompare([]byte(r.Header.Get("Authorization")), []byte(expected)) != 1 {
 				http.Error(w, "unauthorized", http.StatusUnauthorized)
@@ -1062,7 +1067,11 @@ func main() {
 	listenAddr := envOrDefault("SIDECAR_LISTEN_ADDR", "127.0.0.1")
 	apiToken := os.Getenv("SIDECAR_TOKEN")
 	if apiToken == "" {
-		log.Println("[WARN] SIDECAR_TOKEN is not set — the HTTP API accepts unauthenticated requests. Set a token shared with the backend.")
+		// Fail closed: with no shared secret every endpoint below would serve
+		// unauthenticated callers. The backend generates one automatically when
+		// it spawns us locally, so this only fires on a misconfigured split
+		// (container) deployment.
+		log.Fatal("SIDECAR_TOKEN is required — set the same value on the backend and the sidecar")
 	}
 
 	sidecar := NewSidecar()

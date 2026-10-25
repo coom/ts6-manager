@@ -23,3 +23,10 @@ export const proxyApi = {
   update: (trustHops: number) =>
     api.put('/settings/proxy', { trustHops }).then((r) => r.data),
 };
+
+export const limitsApi = {
+  get: (): Promise<{ maxPlaylistImport: number }> =>
+    api.get('/settings/limits').then((r) => r.data),
+  update: (maxPlaylistImport: number) =>
+    api.put('/settings/limits', { maxPlaylistImport }).then((r) => r.data),
+};

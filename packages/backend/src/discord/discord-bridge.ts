@@ -18,6 +18,7 @@ import type { QueueItem } from '../voice/playlist/queue.js';
 import { EventBridge } from '../bot-engine/event-bridge.js';
 import { decrypt } from '../utils/crypto.js';
 import { resolvePlayQuery, downloadAndEnqueue, isSpotifyUrl, loadSpotifyConfig, enqueueSpotify } from '../voice/music-ops.js';
+import { fetchLyrics, lyricsInputFromTrack } from '../voice/lyrics.js';
 import { isCommandAllowed, parseRoleIds } from './command-permissions.js';
 import {
   clientConnectedEmbed,
@@ -28,6 +29,7 @@ import {
   nowPlayingEmbed,
   statsEmbed,
   queueEmbed,
+  lyricsEmbeds,
   DEFAULT_JOIN_TEMPLATE,
   DEFAULT_LEAVE_TEMPLATE,
   awayStatusEmbed,
@@ -36,9 +38,17 @@ import {
   type ServerStats,
 } from './embeds.js';
 import { diffAwayState, mapAwayClients, type AwayClient } from './away-diff.js';
+import {
+  isMusicBotClient,
+  countChannelClients,
+  stripCountSuffix,
+  formatCountNickname,
+  type MusicBotIdentity,
+} from './member-count.js';
 
 const STATS_PANEL_INTERVAL_MS = 60_000;
 const AWAY_POLL_INTERVAL_MS = 10_000;
+const NICKNAME_REFRESH_INTERVAL_MS = 60_000;
 
 export interface DiscordStatus {
   enabled: boolean;
@@ -67,6 +77,10 @@ export class DiscordBridge {
   private voiceRelay: DiscordVoiceRelay | null = null;
   private statsTimer: ReturnType<typeof setInterval> | null = null;
   private awayTimer: ReturnType<typeof setInterval> | null = null;
+  private nicknameTimer: ReturnType<typeof setInterval> | null = null;
+  private baseNickname: string | null = null;
+  private lastAppliedNickname: string | null = null;
+  private nicknameWarned = false;
   private clientAwayState = new Map<string, boolean>(); // clid → isAway
   private nowPlayingListeners = new Map<number, (item: QueueItem) => void>();
   private clientNicknames = new Map<string, string>(); // clid → nickname (for leave events)
@@ -123,7 +137,7 @@ export class DiscordBridge {
       // Privileged: must also be enabled in the Discord developer portal.
       intents.push(GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent);
     }
-    const client = new Client({ intents });
+    const client = new Client({ intents, allowedMentions: { parse: [] } });
     this.client = client;
 
     client.on(Events.ClientReady, () => {
@@ -134,6 +148,7 @@ export class DiscordBridge {
         console.error(`[Discord] ${this.lastError}`);
       });
       this.startStatsPanel();
+      this.startNicknameUpdater();
       this.startVoiceRelay().catch((err) => {
         console.error(`[Discord] Voice relay start failed: ${err.message}`);
       });
@@ -193,6 +208,13 @@ export class DiscordBridge {
       clearInterval(this.awayTimer);
       this.awayTimer = null;
     }
+    if (this.nicknameTimer) {
+      clearInterval(this.nicknameTimer);
+      this.nicknameTimer = null;
+    }
+    this.baseNickname = null;
+    this.lastAppliedNickname = null;
+    this.nicknameWarned = false;
     this.clientAwayState.clear();
     if (this.voiceRelay) {
       this.voiceRelay.destroy();
@@ -289,6 +311,8 @@ export class DiscordBridge {
       new SlashCommandBuilder().setName('volume').setDescription('Régler le volume')
         .addIntegerOption((o) => o.setName('level').setDescription('0-100').setMinValue(0).setMaxValue(100).setRequired(true)),
       new SlashCommandBuilder().setName('nowplaying').setDescription('Piste en cours'),
+      new SlashCommandBuilder().setName('lyrics').setDescription('Paroles de la piste en cours ou d\'une recherche')
+        .addStringOption((o) => o.setName('query').setDescription('Artiste et titre — vide = piste en cours').setRequired(false)),
       new SlashCommandBuilder().setName('stats').setDescription('Stats du serveur TeamSpeak'),
       new SlashCommandBuilder().setName('join').setDescription('Faire venir le bot dans ton salon vocal'),
       new SlashCommandBuilder().setName('leave').setDescription('Faire quitter le salon vocal au bot'),
@@ -424,6 +448,43 @@ export class DiscordBridge {
         }
         break;
       }
+      case 'lyrics': {
+        await i.deferReply();
+        const query = i.options.getString('query');
+
+        let input: { artist?: string; title?: string; query?: string };
+        let label: string;
+        if (query) {
+          input = { query };
+          label = query;
+        } else {
+          const np = this.musicBot().nowPlaying;
+          if (!np) {
+            await i.editReply('Rien en cours de lecture. Précise un titre : `/lyrics query`');
+            return;
+          }
+          ({ input, label } = lyricsInputFromTrack(np));
+        }
+
+        const result = await fetchLyrics(input);
+        if (!result) {
+          await i.editReply(`❌ Paroles introuvables pour « ${label} ».`);
+          return;
+        }
+        if (result.instrumental) {
+          await i.editReply(`♪ **${result.artist} — ${result.title}** : morceau instrumental.`);
+          return;
+        }
+
+        // Discord allows up to 10 embeds per message, one is plenty here;
+        // longer lyrics go out as follow-ups in the same channel.
+        const embeds = lyricsEmbeds(result.artist, result.title, result.lyrics);
+        await i.editReply({ embeds: [embeds[0]] });
+        for (const embed of embeds.slice(1)) {
+          await i.followUp({ embeds: [embed] });
+        }
+        break;
+      }
       case 'stats': {
         await i.deferReply();
         await i.editReply({ embeds: [statsEmbed(await this.fetchStats())] });
@@ -507,32 +568,43 @@ export class DiscordBridge {
 
   private async startTsEventBridge(): Promise<void> {
     const settings = this.settings;
-    if (!settings?.notifyConnections) return; // connect/disconnect notifications disabled
-    if (!settings.notificationsChannelId) return;
+    if (!settings) return;
+    // Presence events feed two independent features: connect/disconnect
+    // notifications and the member-count nickname. The nickname counter is
+    // always on (watched channel or whole server), so the bridge runs
+    // whenever a TS server is configured — Discord posts are gated
+    // separately in onTsEvent().
+    const wantsNotifications = !!(settings.notifyConnections && settings.notificationsChannelId);
     if (!settings.serverConfigId) {
-      this.warnings.push('Notifications enabled but no TS server configured');
+      if (wantsNotifications) this.warnings.push('TS presence features enabled but no TS server configured');
       return;
     }
 
     const server = await this.prisma.tsServerConfig.findUnique({ where: { id: settings.serverConfigId } });
     if (!server?.sshUsername || !server?.sshPassword) {
-      this.warnings.push('TS connect/disconnect notifications need SSH credentials on the server connection');
+      this.warnings.push('TS presence events (notifications, member-count nickname) need SSH credentials on the server connection');
       return;
     }
 
     // Own EventBridge instance: the flow engine prunes SSH connections its
     // flows no longer use, which would silently kill a shared subscription.
     this.eventBridge = new EventBridge(this.prisma);
+    const epoch = this.startEpoch;
     this.eventBridge.on('tsEvent', (_configId, _sid, eventName, data) => {
       if (eventName === 'notifycliententerview' || eventName === 'notifyclientmoved' || eventName === 'notifyclientleftview') {
         console.log(`[Discord] TS event ${eventName}: clid=${data.clid} ctid=${data.ctid ?? ''} cfid=${data.cfid ?? ''} type=${data.client_type ?? ''}`);
+        // In whole-server mode a move never changes the total — skip the refresh.
+        const affectsCount = eventName !== 'notifyclientmoved' || !!this.settings?.notifyChannelId;
+        if (epoch === this.startEpoch && affectsCount) {
+          this.refreshMemberCountNickname().catch(() => { /* logged in the periodic path */ });
+        }
       }
       this.onTsEvent(eventName, data).catch((err) => {
         console.error(`[Discord] TS event handling failed: ${err.message}`);
       });
     });
     await this.eventBridge.connectServer(settings.serverConfigId, settings.virtualServerId);
-    console.log(`[Discord] TS presence bridge active: server=${settings.serverConfigId} sid=${settings.virtualServerId} watchedChannel=${settings.notifyChannelId ?? '(whole server)'} notifChannel=${settings.notificationsChannelId}`);
+    console.log(`[Discord] TS presence bridge active: server=${settings.serverConfigId} sid=${settings.virtualServerId} watchedChannel=${settings.notifyChannelId ?? '(whole server)'} notifChannel=${settings.notificationsChannelId ?? '(none)'} notifications=${wantsNotifications}`);
 
     // Seed the nickname/channel maps with clients already connected before the
     // bridge started (non-blocking: must never gate the event subscription).
@@ -546,8 +618,10 @@ export class DiscordBridge {
     try {
       const client = await this.pool.getOrLoad(settings.serverConfigId);
       const list = await client.execute(settings.virtualServerId, 'clientlist');
+      const bots = this.musicBotIdentity();
       for (const c of Array.isArray(list) ? list : []) {
         if (String(c.client_type) !== '0') continue;
+        if (isMusicBotClient(String(c.clid), c.client_nickname || '', bots)) continue;
         const clid = String(c.clid);
         if (!this.clientNicknames.has(clid)) this.clientNicknames.set(clid, c.client_nickname || `Client #${clid}`);
         if (!this.clientChannels.has(clid)) this.clientChannels.set(clid, String(c.cid));
@@ -583,7 +657,9 @@ export class DiscordBridge {
     const client = await this.pool.getOrLoad(settings.serverConfigId);
     const list = await client.execute(settings.virtualServerId, 'clientlist', { '-away': '' });
     if (epoch !== this.startEpoch) return;
-    const current: AwayClient[] = mapAwayClients(list, watchedChannel);
+    const bots = this.musicBotIdentity();
+    const current: AwayClient[] = mapAwayClients(list, watchedChannel)
+      .filter((c) => !isMusicBotClient(c.clid, c.nickname, bots));
 
     const { changes, next } = diffAwayState(this.clientAwayState, current);
     this.clientAwayState = next;
@@ -607,8 +683,53 @@ export class DiscordBridge {
     await this.postToChannel(this.settings?.notificationsChannelId, payload);
   }
 
+  // ─── Member-count nickname ──────────────────────────────────
+
+  /** Start the periodic member-count nickname refresh (watched channel, or
+   *  whole server when no channel is configured). */
+  private startNicknameUpdater(): void {
+    const epoch = this.startEpoch;
+    const tick = () => {
+      if (epoch !== this.startEpoch) return;
+      this.refreshMemberCountNickname().catch((err) => {
+        console.error(`[Discord] Nickname refresh failed: ${err.message}`);
+      });
+    };
+    this.nicknameTimer = setInterval(tick, NICKNAME_REFRESH_INTERVAL_MS);
+    tick();
+  }
+
+  /** Rename the bot to "Base (N)", N = members of the watched channel — or of
+   *  the whole server when no channel is configured (music bots excluded). */
+  private async refreshMemberCountNickname(): Promise<void> {
+    const settings = this.settings;
+    if (!settings) return;
+    const me = this.guild()?.members?.me; // guild() already guards a not-yet-ready client
+    if (!me) return;
+
+    if (this.baseNickname === null) this.baseNickname = stripCountSuffix(me.displayName);
+    const count = await this.countChannelMembers(settings.notifyChannelId ?? null);
+    const desired = formatCountNickname(this.baseNickname, count);
+    if (desired === this.lastAppliedNickname) return;
+
+    try {
+      await me.setNickname(desired);
+      this.lastAppliedNickname = desired;
+    } catch (err: any) {
+      if (!this.nicknameWarned) {
+        this.nicknameWarned = true;
+        const warning = `Cannot update bot nickname: ${err.message} (missing "Change Nickname" permission?)`;
+        this.warnings.push(warning);
+        console.warn(`[Discord] ${warning}`);
+      }
+    }
+  }
+
   private async onTsEvent(eventName: string, data: Record<string, string>): Promise<void> {
     const watchedChannel = this.settings?.notifyChannelId;
+    // The event subscription may be alive solely for the nickname counter;
+    // only post to Discord when connect/disconnect notifications are enabled.
+    const notify = !!(this.settings?.notifyConnections && this.settings?.notificationsChannelId);
 
     if (eventName === 'notifycliententerview') {
       // Real clients only (query clients are type 1)
@@ -616,13 +737,14 @@ export class DiscordBridge {
       const clid = String(data.clid);
       const nickname = data.client_nickname || `Client #${clid}`;
       const channelId = String(data.ctid || '');
+      if (isMusicBotClient(clid, nickname, this.musicBotIdentity())) return; // never track or announce music bots
       this.clientNicknames.set(clid, nickname);
       this.clientChannels.set(clid, channelId);
 
       if (watchedChannel) {
         // Connected directly into the watched channel → join
-        if (channelId === watchedChannel) await this.notifyChannel('join', nickname, channelId);
-      } else if (String(data.reasonid || '0') === '0') {
+        if (notify && channelId === watchedChannel) await this.notifyChannel('join', nickname, channelId);
+      } else if (notify && String(data.reasonid || '0') === '0') {
         // Server-connect mode (legacy): fresh connections only
         await this.postToChannel(this.settings?.notificationsChannelId, { embeds: [clientConnectedEmbed(nickname)] });
       }
@@ -631,9 +753,11 @@ export class DiscordBridge {
 
     if (eventName === 'notifyclientmoved' && watchedChannel) {
       const clid = String(data.clid);
+      if (this.musicBotIdentity().clids.has(clid)) return; // music bots move silently
       const toChannel = String(data.ctid || '');
       const fromChannel = this.clientChannels.get(clid) ?? String(data.cfid || '');
       this.clientChannels.set(clid, toChannel);
+      if (!notify) return; // map updated — nothing to announce
       const nickname = await this.resolveNickname(clid);
 
       if (toChannel === watchedChannel && fromChannel !== watchedChannel) {
@@ -654,8 +778,8 @@ export class DiscordBridge {
 
       if (watchedChannel) {
         // Disconnected while inside the watched channel → leave
-        if (lastChannel === watchedChannel) await this.notifyChannel('leave', nickname, watchedChannel);
-      } else {
+        if (notify && lastChannel === watchedChannel) await this.notifyChannel('leave', nickname, watchedChannel);
+      } else if (notify) {
         await this.postToChannel(this.settings?.notificationsChannelId, { embeds: [clientDisconnectedEmbed(nickname)] });
       }
     }
@@ -675,16 +799,33 @@ export class DiscordBridge {
     await this.postToChannel(this.settings?.notificationsChannelId, payload);
   }
 
-  /** Number of real clients currently in the given TS channel. */
-  private async countChannelMembers(channelId: string): Promise<number> {
+  /** Identity (clids + configured nicknames) of the currently running music bots.
+   *  The nickname fallback only covers the connect window of a starting bot (clid
+   *  not yet known), so it must not apply to stopped/errored bots — a human whose
+   *  nickname collides with an inactive bot's name would be wrongly excluded. */
+  private musicBotIdentity(): MusicBotIdentity {
+    const clids = new Set<string>();
+    const nicknames = new Set<string>();
+    for (const { bot } of this.voiceBotManager.getAllBots()) {
+      // clids are per-virtual-server integers — a bot's clid on another server
+      // must not exclude a human with the same clid on the watched server.
+      if (bot.currentConfig.serverConfigId !== this.settings?.serverConfigId) continue;
+      if (bot.ts3ClientId > 0) clids.add(String(bot.ts3ClientId));
+      const active = bot.status !== 'stopped' && bot.status !== 'error';
+      if (active && bot.currentConfig.nickname) nicknames.add(bot.currentConfig.nickname);
+    }
+    return { clids, nicknames };
+  }
+
+  /** Number of real clients currently in the given TS channel — or on the
+   *  whole server when channelId is null (music bots excluded). */
+  private async countChannelMembers(channelId: string | null): Promise<number> {
     const settings = this.settings;
     if (!settings?.serverConfigId) return 0;
     try {
       const client = await this.pool.getOrLoad(settings.serverConfigId);
       const list = await client.execute(settings.virtualServerId, 'clientlist');
-      return (Array.isArray(list) ? list : []).filter(
-        (c: any) => String(c.cid) === channelId && String(c.client_type) === '0',
-      ).length;
+      return countChannelClients(list, channelId, this.musicBotIdentity());
     } catch {
       return 0;
     }

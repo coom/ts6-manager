@@ -2,13 +2,23 @@ import { Client as SSH2Client, type ClientChannel } from 'ssh2';
 import { EventEmitter } from 'events';
 import { parseQueryResponse } from '@ts6/common';
 import { TS_EVENT_TYPES } from '@ts6/common';
-import crypto from 'crypto';
+import crypto, { createHash, timingSafeEqual } from 'crypto';
 
 export interface SshQueryClientOptions {
   host: string;
   port: number;
   username: string;
   password: string;
+  /** Pinned SHA-256 host-key fingerprint, or null/undefined to pin on first use. */
+  hostKeyFingerprint?: string | null;
+  /** Called with the fingerprint observed on a first connect, so it can be persisted. */
+  onHostKeyPinned?: (fingerprint: string) => void;
+}
+
+/** OpenSSH-style fingerprint: "SHA256:<base64 of the key digest, unpadded>". */
+export function sshHostKeyFingerprint(key: Buffer): string {
+  const digest = createHash('sha256').update(key).digest('base64').replace(/=+$/, '');
+  return `SHA256:${digest}`;
 }
 
 interface QueuedCommand {
@@ -141,6 +151,29 @@ export class SshQueryClient extends EventEmitter {
         port: this.options.port,
         username: this.options.username,
         password: this.options.password,
+        // Without a verifier ssh2 accepts ANY host key, so a machine-in-the-
+        // middle would receive the ServerQuery password in the clear. Pin the
+        // key on first connect and refuse a changed one from then on.
+        hostVerifier: (key: Buffer): boolean => {
+          const seen = sshHostKeyFingerprint(key);
+          const pinned = this.options.hostKeyFingerprint;
+          if (!pinned) {
+            console.log(`[SshQueryClient] Pinning host key for ${this.options.host}:${this.options.port} — ${seen}`);
+            this.options.hostKeyFingerprint = seen;
+            this.options.onHostKeyPinned?.(seen);
+            return true;
+          }
+          const a = Buffer.from(seen, 'utf8');
+          const b = Buffer.from(pinned, 'utf8');
+          const ok = a.length === b.length && timingSafeEqual(a, b);
+          if (!ok) {
+            console.error(
+              `[SshQueryClient] HOST KEY MISMATCH for ${this.options.host}:${this.options.port} — ` +
+              `expected ${pinned}, got ${seen}. Refusing to connect.`,
+            );
+          }
+          return ok;
+        },
         keepaliveInterval: 30000, // TCP-level keepalive every 30s
         keepaliveCountMax: 3, // Disconnect after 3 missed keepalives (~90s)
         readyTimeout: 10000,

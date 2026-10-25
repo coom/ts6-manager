@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { createCipheriv, randomBytes, scryptSync } from 'crypto';
 
 // Must be set before the module under test reads config
-process.env.JWT_SECRET = 'test-jwt-secret';
-process.env.ENCRYPTION_KEY = 'test-encryption-key';
+process.env.JWT_SECRET = 'test-jwt-secret-padded-to-32-chars-min';
+process.env.ENCRYPTION_KEY = 'test-encryption-key-padded-to-32-chars';
 process.env.NODE_ENV = 'test';
 
 const { encrypt, decrypt } = await import('./crypto.js');
@@ -30,7 +30,7 @@ describe('crypto', () => {
 
   it('still decrypts values encrypted with the legacy JWT_SECRET-derived key', () => {
     // Reproduce what encrypt() did before ENCRYPTION_KEY existed
-    const legacyKey = scryptSync('test-jwt-secret', 'ts6-webui-enc-v1', 32);
+    const legacyKey = scryptSync('test-jwt-secret-padded-to-32-chars-min', 'ts6-webui-enc-v1', 32);
     const iv = randomBytes(12);
     const cipher = createCipheriv('aes-256-gcm', legacyKey, iv);
     let ct = cipher.update('old-stored-credential', 'utf8', 'hex');

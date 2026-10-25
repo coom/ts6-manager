@@ -25,7 +25,9 @@ clientRoutes.get('/', async (req: Request, res: Response, next) => {
   } catch (err) { next(err); }
 });
 
-clientRoutes.get('/database', async (req: Request, res: Response, next) => {
+// clientdblist/clientdbinfo both return client_lastip, which would hand a viewer
+// the very data the M2 control above withholds from clientlist. Admin-only.
+clientRoutes.get('/database', requireRole('admin'), async (req: Request, res: Response, next) => {
   try {
     const result = await getClient(req).execute(getSid(req), 'clientdblist', {
       start: req.query.start || 0, duration: req.query.duration || 100,
@@ -34,7 +36,7 @@ clientRoutes.get('/database', async (req: Request, res: Response, next) => {
   } catch (err) { next(err); }
 });
 
-clientRoutes.get('/database/:cldbid', async (req: Request, res: Response, next) => {
+clientRoutes.get('/database/:cldbid', requireRole('admin'), async (req: Request, res: Response, next) => {
   try {
     const result = await getClient(req).execute(getSid(req), 'clientdbinfo', { cldbid: String(req.params.cldbid) });
     res.json(result);

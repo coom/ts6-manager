@@ -10,7 +10,10 @@ const getClient = (req: Request) => {
 };
 const getSid = (req: Request) => parseInt(String(req.params.sid));
 
-tokenRoutes.get('/', async (req: Request, res: Response, next) => {
+// privilegekeylist returns the full token strings, not just metadata: a pending
+// Server Admin key read here can be redeemed in a TS client, so this must match
+// the admin guard already on create/delete.
+tokenRoutes.get('/', requireRole('admin'), async (req: Request, res: Response, next) => {
   try { res.json(await getClient(req).execute(getSid(req), 'privilegekeylist')); } catch (err) { next(err); }
 });
 

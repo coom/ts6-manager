@@ -279,7 +279,17 @@
       "toastCookiesSaved": "Cookies gespeichert",
       "toastSaveFailed": "Cookies konnten nicht gespeichert werden",
       "toastCookiesRemoved": "Cookie-Datei entfernt",
-      "toastRemoveFailed": "Cookies konnten nicht entfernt werden"
+      "toastRemoveFailed": "Cookies konnten nicht entfernt werden",
+      "playlistLimit": {
+        "title": "Limit für Playlist-Import",
+        "description": "Maximale Anzahl an Titeln, die beim Import einer YouTube-Playlist geladen werden — aus der Musikbibliothek oder per !play in TeamSpeak/Discord.",
+        "maxTracks": "Max. Titel pro Import",
+        "hint": "Bereits in der Playlist vorhandene Titel zählen nicht zum Limit. Alles darüber hinaus wird als übersprungen gemeldet und nie heruntergeladen. 0 deaktiviert den Import.",
+        "save": "Speichern",
+        "saving": "Speichern...",
+        "toastSaved": "Import-Limit gespeichert",
+        "toastSaveFailed": "Import-Limit konnte nicht gespeichert werden"
+      }
     },
     "discord": {
       "title": "Discord-Integration",
@@ -312,7 +322,7 @@
       "watchChannel": "Einen bestimmten Kanal überwachen",
       "wholeServer": "Ganzer Server (Verbinden / Trennen)",
       "watchChannelPlaceholder": "Kanal-ID (oder leer lassen für den ganzen Server)",
-      "watchChannelHint": "Leer = bei Server-Verbindung/-Trennung benachrichtigen. Gesetzt = nur bei Beitritt/Verlassen dieses Kanals benachrichtigen.",
+      "watchChannelHint": "Leer = bei Server-Verbindung/-Trennung benachrichtigen, Mitgliederzahl für den ganzen Server. Gesetzt = Benachrichtigungen und Mitgliederzahl nur für diesen Kanal. Die Zahl erscheint im Nicknamen des Bots, Musik-Bots ausgenommen.",
       "joinMessage": "Beitrittsnachricht",
       "leaveMessage": "Verlassensnachricht",
       "templateVariables": "Variablen:",
@@ -1254,5 +1264,15 @@
       "moveDown": "Nach unten",
       "removeTooltip": "Aus der Warteschlange entfernen"
     }
+  },
+  "playlistImport": {
+    "button": "Playlist importieren",
+    "started": "Importiere „{{name}}“ — {{n}} Titel",
+    "progress": "Import läuft… {{done}} von {{total}}",
+    "done": "Import abgeschlossen — {{done}} Titel hinzugefügt",
+    "skipped": "{{n}} bereits vorhanden",
+    "truncated": "{{n}} über dem Limit",
+    "failed": "Playlist-Import fehlgeschlagen",
+    "lost": "Import-Status verloren — der Vorgang ist möglicherweise abgeschlossen oder der Server wurde neu gestartet"
   }
 }

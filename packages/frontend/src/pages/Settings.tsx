@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usersApi } from '@/api/bots.api';
 import { authApi } from '@/api/auth.api';
 import { serversApi } from '@/api/servers.api';
-import { settingsApi, proxyApi } from '@/api/settings.api';
+import { settingsApi, proxyApi, limitsApi } from '@/api/settings.api';
 import { discordApi, type DiscordSettings } from '@/api/discord.api';
 import { spotifyApi } from '@/api/spotify.api';
 import { musicCommandSettingsApi } from '@/api/music-command-settings.api';
@@ -843,7 +843,53 @@ function YouTubeTab() {
           )}
         </CardContent>
       </Card>
+
+      <PlaylistImportLimitCard />
     </div>
+  );
+}
+
+// ─── Playlist Import Limit Card ──────────────────────────────
+
+function PlaylistImportLimitCard() {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const { data } = useQuery({ queryKey: ['settings-limits'], queryFn: limitsApi.get });
+  const [max, setMax] = useState(50);
+
+  const [seededData, setSeededData] = useState<typeof data>(undefined);
+  if (data && data !== seededData) {
+    setSeededData(data);
+    setMax(data.maxPlaylistImport);
+  }
+
+  const save = useMutation({
+    mutationFn: () => limitsApi.update(max),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['settings-limits'] });
+      toast.success(t('settings.youtube.playlistLimit.toastSaved'));
+    },
+    onError: (err: any) => toast.error(err.response?.data?.error || t('settings.youtube.playlistLimit.toastSaveFailed')),
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-sm font-medium">{t('settings.youtube.playlistLimit.title')}</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <p className="text-xs text-muted-foreground">{t('settings.youtube.playlistLimit.description')}</p>
+        <div className="flex items-center gap-3">
+          <Label className="text-xs w-40">{t('settings.youtube.playlistLimit.maxTracks')}</Label>
+          <Input className="h-8 text-xs w-24" type="number" min={0} max={1000} value={max}
+            onChange={(e) => setMax(parseInt(e.target.value) || 0)} />
+        </div>
+        <p className="text-[10px] text-muted-foreground">{t('settings.youtube.playlistLimit.hint')}</p>
+        <Button size="sm" onClick={() => save.mutate()} disabled={save.isPending}>
+          {save.isPending ? t('settings.youtube.playlistLimit.saving') : t('settings.youtube.playlistLimit.save')}
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -1013,6 +1059,27 @@ function DiscordTab() {
 
         <div className="space-y-2 pt-1">
           <Label className="text-xs font-medium">{t('settings.discord.notifications')}</Label>
+
+          {/* Watched channel drives notifications AND the member-count nickname — always visible */}
+          <div className="space-y-1.5">
+            <Label className="text-[11px]">{t('settings.discord.watchChannel')}</Label>
+            {tsChannels.length > 0 ? (
+              <Select value={form.notifyChannelId || 'server'} onValueChange={(v) => setForm((f) => ({ ...f, notifyChannelId: v === 'server' ? null : v }))}>
+                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="server">{t('settings.discord.wholeServer')}</SelectItem>
+                  {tsChannels.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input className="h-8 text-xs" placeholder={t('settings.discord.watchChannelPlaceholder')}
+                value={form.notifyChannelId || ''} onChange={(e) => setForm((f) => ({ ...f, notifyChannelId: e.target.value || null }))} />
+            )}
+            <p className="text-[10px] text-muted-foreground">
+              {t('settings.discord.watchChannelHint')}
+            </p>
+          </div>
+
           <div className="flex items-center gap-2">
             <Switch checked={!!form.notifyConnections} onCheckedChange={(v) => setForm((f) => ({ ...f, notifyConnections: v }))} />
             <Label className="text-xs font-normal">{t('settings.discord.tsPresence')}</Label>
@@ -1020,25 +1087,6 @@ function DiscordTab() {
 
           {form.notifyConnections && (
             <div className="ml-9 space-y-2 border-l border-border pl-3">
-              <div className="space-y-1.5">
-                <Label className="text-[11px]">{t('settings.discord.watchChannel')}</Label>
-                {tsChannels.length > 0 ? (
-                  <Select value={form.notifyChannelId || 'server'} onValueChange={(v) => setForm((f) => ({ ...f, notifyChannelId: v === 'server' ? null : v }))}>
-                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="server">{t('settings.discord.wholeServer')}</SelectItem>
-                      {tsChannels.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <Input className="h-8 text-xs" placeholder={t('settings.discord.watchChannelPlaceholder')}
-                    value={form.notifyChannelId || ''} onChange={(e) => setForm((f) => ({ ...f, notifyChannelId: e.target.value || null }))} />
-                )}
-                <p className="text-[10px] text-muted-foreground">
-                  {t('settings.discord.watchChannelHint')}
-                </p>
-              </div>
-
               {form.notifyChannelId && (
                 <div className="grid grid-cols-1 gap-2">
                   <div className="flex items-center gap-2">

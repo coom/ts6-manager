@@ -3,6 +3,7 @@ import type { VoiceBot } from './voice-bot.js';
 import type { QueueItem } from './playlist/queue.js';
 import { downloadYouTube, searchYouTube } from './audio/youtube.js';
 import { decrypt } from '../utils/crypto.js';
+import { validateUrl } from '../utils/url-validator.js';
 import {
   resolveSpotifyInput,
   findBestYouTubeForSpotify,
@@ -119,6 +120,14 @@ export interface PlayResult {
  * playback unless something is already playing.
  */
 export async function downloadAndEnqueue(prisma: PrismaClient, bot: VoiceBot, url: string): Promise<PlayResult> {
+  // !play / !queue are reachable by any TS or Discord user when no command
+  // server-group is configured, so the URL is untrusted: block private ranges
+  // and cloud-metadata endpoints before yt-dlp fetches it.
+  const check = await validateUrl(url, { allowedProtocols: ['http:', 'https:'] });
+  if (!check.valid) {
+    throw new Error(`URL blocked: ${check.error}`);
+  }
+
   const { filePath, info } = await downloadYouTube(url, MUSIC_DIR);
 
   const item: QueueItem = {

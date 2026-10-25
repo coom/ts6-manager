@@ -9,14 +9,14 @@ services:
       - NODE_ENV=production
       - PORT=3001
       - DATABASE_URL=file:/app/packages/backend/data/ts6webui.db
-      - JWT_SECRET=${JWT_SECRET:?Set JWT_SECRET in .env or environment}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY:-}
+      - "JWT_SECRET=${JWT_SECRET:?Set JWT_SECRET in .env or environment}"
+      - "ENCRYPTION_KEY=${ENCRYPTION_KEY:?set ENCRYPTION_KEY in .env, different from JWT_SECRET - generate with openssl rand -hex 32}"
       - JWT_ACCESS_EXPIRY=15m
       - JWT_REFRESH_EXPIRY=7d
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3090}
       - MUSIC_DIR=/data/music
       - SIDECAR_URL=http://ts6-sidecar-dev:9800
-      - SIDECAR_TOKEN=${SIDECAR_TOKEN:-}
+      - "SIDECAR_TOKEN=${SIDECAR_TOKEN:?set SIDECAR_TOKEN in .env - generate with openssl rand -hex 32}"
     volumes:
       - backend-data:/app/packages/backend/data
       - music-data:/data/music
@@ -34,7 +34,7 @@ services:
     environment:
       - SIDECAR_PORT=9800
       - SIDECAR_LISTEN_ADDR=0.0.0.0
-      - SIDECAR_TOKEN=${SIDECAR_TOKEN:-}
+      - "SIDECAR_TOKEN=${SIDECAR_TOKEN:?set SIDECAR_TOKEN in .env - generate with openssl rand -hex 32}"
     networks:
       - ts6-network
 
