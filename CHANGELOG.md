@@ -71,6 +71,23 @@ Full security review of the codebase. Twelve issues, three of them high severity
   `postcss-selector-parser`, both reached only through the Tailwind 3 build.
   The previously ignored esbuild advisory has been withdrawn and is no longer
   listed.
+- **Dependency advisories published after 2026-10-17.** The scheduled CI run of
+  2026-10-26 failed again on advisories published after the previous fix.
+  multer moves to 2.5.0 (DoS through an asynchronous `fileFilter` still pending
+  after the request is closed; not reachable here, the only `fileFilter` is
+  synchronous), body-parser to 1.20.9 (DoS through extra bytes after a
+  compressed body) and follow-redirects to 1.16.2 (credential headers could
+  survive a cross-origin redirect when passed as an array or declared through
+  `sensitiveHeaders`). vite moves to 6.4.5 (development server only:
+  `launch-editor`, custom middleware and `server.fs.allow`). `zod` is removed
+  from the backend and the frontend, where it was never imported, and the copy
+  still pulled in by the lint toolchain (`eslint-plugin-react-hooks`) is forced
+  to 4.x (4.6.7) through `pnpm.overrides`, since no 3.x release fixes its
+  advisory. The media sidecar now requires Go 1.27.3 (`crypto/x509`, reachable
+  through the closing of the PeerConnection) and `x/net` moves to 0.62 (with
+  `x/crypto` 0.58 and `x/sys` 0.49 as its dependencies). The official golang
+  image pins `GOTOOLCHAIN=local`, so a host with a cached `golang:1.27-bookworm`
+  older than 1.27.3 must rebuild with `docker compose build --pull`.
 
 ### Changed
 
